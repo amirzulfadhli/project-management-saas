@@ -1,0 +1,417 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OrganizationRole {
+  OWNER
+  MEMBER
+}
+
+enum ProjectRole {
+  OWNER
+  MEMBER
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  emailVerified       Boolean              @default(false)
+  name                String
+  image               String?
+  password            String?
+  role                String               @default("member")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  accounts            Account[]
+  activities          Activity[]           @relation("ActivityUser")
+  apiTokens           ApiToken[]
+  comments            Comment[]            @relation("CommentAuthor")
+  files               File[]               @relation("FileUser")
+  notifications       Notification[]
+  ownedOrganizations  Organization[]       @relation("OrganizationOwner")
+  organizationMembers OrganizationMember[]
+  projectMembers      ProjectMember[]
+  sessions            Session[]
+  assignedTasks       Task[]               @relation("TaskAssignee")
+  reportedTasks       Task[]               @relation("TaskReporter")
+  teamMembers         TeamMember[]
+  timeLogs            TimeLog[]            @relation("TimeLogUser")
+}
+
+model Organization {
+  id        String               @id @default(uuid())
+  name      String
+  slug      String               @unique
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  ownerId   String
+  apiTokens ApiToken[]
+  owner     User                 @relation("OrganizationOwner", fields: [ownerId], references: [id])
+  members   OrganizationMember[]
+  projects  Project[]
+  teams     Team[]
+
+  @@index([ownerId])
+}
+
+model OrganizationMember {
+  id             String           @id @default(uuid())
+  role           OrganizationRole @default(MEMBER)
+  organizationId String
+  userId         String
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  user           User             @relation(fields: [userId], references: [id])
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model Team {
+  id             String       @id @default(uuid())
+  name           String
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  projects       Project[]    @relation("ProjectTeams")
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  members        TeamMember[]
+}
+
+model TeamMember {
+  id     String @id @default(uuid())
+  role   String @default("member")
+  teamId String
+  userId String
+  team   Team   @relation(fields: [teamId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+}
+
+model Project {
+  id             String          @id @default(uuid())
+  name           String
+  description    String?
+  organizationId String
+  teamId         String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  archivedAt     DateTime?
+  activities     Activity[]      @relation("ActivityProject")
+  board          Board?          @relation("ProjectBoard")
+  columns        Column[]
+  files          File[]          @relation("FileProject")
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  team           Team?           @relation("ProjectTeams", fields: [teamId], references: [id])
+  projectMembers ProjectMember[]
+  repository     Repository?
+  tasks          Task[]
+  wiki           Wiki?           @relation("WikiProject")
+
+  @@index([organizationId, archivedAt])
+}
+
+model ProjectMember {
+  id        String      @id @default(uuid())
+  role      ProjectRole @default(MEMBER)
+  projectId String
+  userId    String
+  project   Project     @relation(fields: [projectId], references: [id])
+  user      User        @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model Board {
+  id        String   @id @default(uuid())
+  name      String   @default("Main Board")
+  projectId String   @unique
+  project   Project  @relation("ProjectBoard", fields: [projectId], references: [id])
+  columns   Column[]
+}
+
+model Column {
+  id        String  @id @default(uuid())
+  name      String
+  projectId String
+  position  Int     @default(0)
+  boardId   String?
+  board     Board?  @relation(fields: [boardId], references: [id])
+  project   Project @relation(fields: [projectId], references: [id])
+  tasks     Task[]
+
+  @@unique([projectId, position], name: "Column_projectId_position_key")
+}
+
+model Task {
+  id                String          @id @default(uuid())
+  title             String
+  description       String?
+  columnId          String
+  projectId         String
+  assigneeId        String?
+  reporterId        String
+  priority          Int             @default(1)
+  status            String          @default("todo")
+  dueDate           DateTime?
+  estimatedTime     Int?
+  actualTime        Int?
+  startDate         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  githubIssueId     String?
+  githubIssueNumber Int?
+  githubBranch      String?
+  githubPrNumbers   String[]
+  deploymentStatus  String?
+  activities        Activity[]      @relation("ActivityTask")
+  branches          Branch[]
+  checklistItems    ChecklistItem[]
+  comments          Comment[]
+  files             File[]          @relation("FileTask")
+  issues            Issue[]
+  subtasks          Subtask[]
+  assignee          User?           @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  column            Column          @relation(fields: [columnId], references: [id])
+  project           Project         @relation(fields: [projectId], references: [id])
+  reporter          User            @relation("TaskReporter", fields: [reporterId], references: [id])
+  timeLogs          TimeLog[]
+  pullRequests      PullRequest[]   @relation("PullRequestTasks")
+
+  @@index([projectId, createdAt])
+  @@index([columnId])
+}
+
+model Subtask {
+  id        String   @id @default(uuid())
+  title     String
+  completed Boolean  @default(false)
+  taskId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  task      Task     @relation(fields: [taskId], references: [id])
+}
+
+model Comment {
+  id            String    @id @default(uuid())
+  content       String
+  taskId        String
+  authorId      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  parentId      String?
+  author        User      @relation("CommentAuthor", fields: [authorId], references: [id])
+  parentComment Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies       Comment[] @relation("CommentReplies")
+  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt, id])
+  @@index([parentId])
+}
+
+model Activity {
+  id          String   @id @default(uuid())
+  type        String
+  description String
+  taskId      String?
+  projectId   String
+  userId      String
+  createdAt   DateTime @default(now())
+  metadata    Json?
+  project     Project  @relation("ActivityProject", fields: [projectId], references: [id], onDelete: Restrict)
+  task        Task?    @relation("ActivityTask", fields: [taskId], references: [id], onDelete: SetNull)
+  user        User     @relation("ActivityUser", fields: [userId], references: [id])
+
+  @@index([projectId, createdAt, id])
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  type       String
+  title      String
+  message    String
+  isRead     Boolean  @default(false)
+  userId     String
+  entityId   String?
+  entityType String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model File {
+  id           String   @id @default(uuid())
+  name         String
+  url          String
+  mimeType     String
+  size         Int
+  taskId       String?
+  projectId    String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+  project      Project? @relation("FileProject", fields: [projectId], references: [id])
+  task         Task?    @relation("FileTask", fields: [taskId], references: [id])
+  user         User     @relation("FileUser", fields: [uploadedById], references: [id])
+}
+
+model Wiki {
+  id        String   @id @default(uuid())
+  title     String
+  content   String?
+  projectId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation("WikiProject", fields: [projectId], references: [id])
+}
+
+model Repository {
+  id          String        @id @default(uuid())
+  name        String
+  fullName    String
+  provider    String
+  url         String
+  projectId   String?       @unique
+  webhookId   String?
+  branch      Branch[]
+  issue       Issue[]
+  pullRequest PullRequest[]
+  project     Project?      @relation(fields: [projectId], references: [id])
+  webhook     Webhook?      @relation("WebhookRepository")
+}
+
+model Issue {
+  id           String     @id @default(uuid())
+  number       Int
+  title        String
+  body         String?
+  state        String
+  url          String
+  repositoryId String
+  taskId       String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  closedAt     DateTime?
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+  task         Task?      @relation(fields: [taskId], references: [id])
+}
+
+model Branch {
+  id           String     @id @default(uuid())
+  name         String
+  repositoryId String
+  taskId       String?
+  createdAt    DateTime   @default(now())
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+  task         Task?      @relation(fields: [taskId], references: [id])
+}
+
+model PullRequest {
+  id           String     @id @default(uuid())
+  number       Int
+  title        String
+  body         String?
+  state        String
+  url          String
+  repositoryId String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  mergedAt     DateTime?
+  repository   Repository @relation(fields: [repositoryId], references: [id])
+  tasks        Task[]     @relation("PullRequestTasks")
+}
+
+model ApiToken {
+  id             String        @id @default(uuid())
+  name           String
+  token          String        @unique
+  userId         String
+  organizationId String?
+  expiresAt      DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Account {
+  id                    String    @id @default(uuid())
+  providerId            String
+  issuer                String
+  accountId             String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id])
+
+  @@unique([issuer, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(uuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+model TimeLog {
+  id          String    @id @default(uuid())
+  taskId      String
+  userId      String
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int?
+  description String?
+  createdAt   DateTime  @default(now())
+  task        Task      @relation(fields: [taskId], references: [id])
+  user        User      @relation("TimeLogUser", fields: [userId], references: [id])
+}
+
+model ChecklistItem {
+  id        String   @id @default(uuid())
+  title     String
+  completed Boolean  @default(false)
+  taskId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  task      Task     @relation(fields: [taskId], references: [id])
+}
+
+model Webhook {
+  id           String     @id @default(uuid())
+  url          String
+  secret       String
+  repositoryId String     @unique
+  createdAt    DateTime   @default(now())
+  repository   Repository @relation("WebhookRepository", fields: [repositoryId], references: [id])
+}

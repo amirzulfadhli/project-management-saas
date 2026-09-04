@@ -1,0 +1,10 @@
+node_modules
+dist
+generated
+coverage
+.env
+.env.*
+*.log
+project-management-saas
+test
+README.md

@@ -1,0 +1,66 @@
+name: flowplan
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: flowplan
+      POSTGRES_USER: flowplan
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env file}
+    volumes:
+      - flowplan-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowplan -d flowplan"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: ./backend
+      target: migration
+    environment:
+      DATABASE_URL: postgresql://flowplan:${POSTGRES_PASSWORD}@postgres:5432/flowplan?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+      target: runner
+    environment:
+      NODE_ENV: production
+      FLOWPLAN_ALLOW_INSECURE_LOCALHOST: "true"
+      DATABASE_URL: postgresql://flowplan:${POSTGRES_PASSWORD}@postgres:5432/flowplan?schema=public
+      BETTER_AUTH_URL: ${PUBLIC_BACKEND_URL:-http://localhost:3001}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in the root .env file}
+      FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-http://localhost:3000}
+      PORT: 3001
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_BACKEND_URL:-http://localhost:3001}
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  flowplan-postgres:

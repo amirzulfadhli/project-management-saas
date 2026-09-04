@@ -1,0 +1,34 @@
+import { Prisma } from '../../generated/prisma/client';
+
+export const ActivityEvent = {
+  PROJECT_CREATED: 'PROJECT_CREATED',
+  PROJECT_UPDATED: 'PROJECT_UPDATED',
+  PROJECT_ARCHIVED: 'PROJECT_ARCHIVED',
+  PROJECT_DUPLICATED: 'PROJECT_DUPLICATED',
+  PROJECT_MEMBER_ADDED: 'PROJECT_MEMBER_ADDED',
+  PROJECT_MEMBER_ROLE_CHANGED: 'PROJECT_MEMBER_ROLE_CHANGED',
+  PROJECT_MEMBER_REMOVED: 'PROJECT_MEMBER_REMOVED',
+  TASK_CREATED: 'TASK_CREATED',
+  TASK_RENAMED: 'TASK_RENAMED',
+  TASK_UPDATED: 'TASK_UPDATED',
+  TASK_MOVED: 'TASK_MOVED',
+  TASK_STATUS_CHANGED: 'TASK_STATUS_CHANGED',
+  TASK_ASSIGNEE_CHANGED: 'TASK_ASSIGNEE_CHANGED',
+  TASK_PRIORITY_CHANGED: 'TASK_PRIORITY_CHANGED',
+  TASK_DELETED: 'TASK_DELETED',
+  COMMENT_CREATED: 'COMMENT_CREATED',
+  COMMENT_UPDATED: 'COMMENT_UPDATED',
+  COMMENT_DELETED: 'COMMENT_DELETED',
+} as const;
+
+export type ActivityEventType =
+  (typeof ActivityEvent)[keyof typeof ActivityEvent];
+
+export interface RecordActivityInput {
+  type: ActivityEventType;
+  description: string;
+  projectId: string;
+  userId: string;
+  taskId?: string | null;
+  metadata?: Prisma.InputJsonValue;
+}

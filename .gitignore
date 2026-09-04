@@ -1,0 +1,41 @@
+# Dependencies and build output
+**/node_modules/
+**/.next/
+**/dist/
+**/build/
+**/coverage/
+**/*.tsbuildinfo
+**/.cache/
+**/.turbo/
+**/.eslintcache
+
+# Runtime-generated clients and local artifacts
+backend/generated/
+*.log
+*.pid
+*.db
+*.sqlite
+*.sqlite3
+**/tmp/
+**/temp/
+
+# Secrets: examples are intentionally committed
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+**/.agents/
+**/.claude/
+**/.windsurf/
+**/skills-lock.json
+
+# Preserved legacy starter copy; not part of the active applications
+backend/project-management-saas/
