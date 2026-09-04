@@ -20,10 +20,10 @@ the persistent PostgreSQL volume. Prisma tooling stages now install OpenSSL so
 Prisma can detect the correct Debian Bookworm ABI; the final runner remains
 minimal.
 
-This is deployment foundation, not proof of a public deployment. The next
-milestones are Git/GitHub CI stabilization followed by a real HTTPS
-staging/Coolify deployment with proxy, cookie, CORS, migration, restart, and
-smoke verification.
+This is deployment foundation, not proof of a public deployment. The local Git
+repository and CI foundation described below are now complete; the next
+milestone is a real HTTPS staging/Coolify deployment with proxy, cookie, CORS,
+migration, restart, and smoke verification.
 
 ## Git repository and CI foundation
 
@@ -34,8 +34,10 @@ logs, caches, and local database files are ignored; environment examples,
 package lockfiles, the Prisma schema, and all seven migrations remain repository
 inputs. GitHub Actions performs clean frontend/backend installs and builds plus
 backend unit and PostgreSQL-backed E2E verification using disposable CI-only
-configuration. A real GitHub-hosted workflow run remains the final remote check
-before Coolify staging.
+configuration. Local clean-checkout verification passed from both lockfiles,
+including 11 backend unit suites (64 tests), 9 PostgreSQL E2E suites (57 tests),
+and both production builds. A real GitHub-hosted workflow run remains the final
+remote check before Coolify staging.
 
 ## ✅ Working
 
