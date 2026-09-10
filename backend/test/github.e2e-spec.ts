@@ -608,6 +608,12 @@ describe('GitHub integration core backend (e2e)', () => {
     expect(concurrentImports.map(({ status }) => status).sort()).toEqual([
       201, 409,
     ]);
+    const importedResponse = concurrentImports.find(
+      ({ status }) => status === 201,
+    );
+    const importedBody = importedResponse?.body as unknown as
+      { task: unknown } | undefined;
+    expect(importedBody?.task).not.toHaveProperty('status');
     expect(
       await prisma.issue.count({
         where: { repositoryId: repository.id, externalIssueId: '900043' },

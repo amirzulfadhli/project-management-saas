@@ -205,6 +205,8 @@ describe('Task core lifecycle (e2e)', () => {
       .expect(201);
     const created = response.body as TaskResponse;
 
+    expect(response.body).not.toHaveProperty('status');
+
     expect(created).toMatchObject({
       title: 'Ship Task Core',
       projectId: projectA.id,
@@ -331,6 +333,8 @@ describe('Task core lifecycle (e2e)', () => {
       })
       .expect(200);
     const moved = firstMoveResponse.body as TaskResponse;
+
+    expect(firstMoveResponse.body).not.toHaveProperty('status');
 
     expect(moved).toMatchObject({
       id: task.id,

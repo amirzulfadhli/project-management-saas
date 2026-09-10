@@ -225,6 +225,7 @@ export class GithubIssuesService {
             position: (lastTask?.position ?? -1) + 1,
             reporterId: userId,
           },
+          omit: { status: true },
           include: taskInclude,
         });
         const issue = await tx.issue.create({

@@ -27,7 +27,10 @@ const taskInclude = {
   project: { select: { id: true, name: true } },
 } satisfies Prisma.TaskInclude;
 
-type TaskDetail = Prisma.TaskGetPayload<{ include: typeof taskInclude }>;
+type TaskDetail = Prisma.TaskGetPayload<{
+  omit: { status: true };
+  include: typeof taskInclude;
+}>;
 
 const accessibleProjectWhere = (userId: string): Prisma.ProjectWhereInput => ({
   OR: [
@@ -79,6 +82,7 @@ export class TasksService {
             estimatedTime: dto.estimatedTime ?? null,
             startDate: dto.startDate ?? null,
           },
+          omit: { status: true },
           include: taskInclude,
         });
         await this.activities.record(tx, {
@@ -141,6 +145,7 @@ export class TasksService {
 
     return this.prisma.task.findMany({
       where,
+      omit: { status: true },
       include: taskInclude,
       orderBy: [
         { projectId: 'asc' },
@@ -154,6 +159,7 @@ export class TasksService {
   async findOne(userId: string, id: string) {
     const task = await this.prisma.task.findUnique({
       where: { id },
+      omit: { status: true },
       include: taskInclude,
     });
     if (!task) throw new NotFoundException('Task not found');
@@ -209,6 +215,7 @@ export class TasksService {
         const updated = await tx.task.update({
           where: { id },
           data,
+          omit: { status: true },
           include: taskInclude,
         });
         await this.recordTaskChanges(tx, userId, before, updated, dto);
@@ -253,6 +260,7 @@ export class TasksService {
 
         const moved = await tx.task.findUniqueOrThrow({
           where: { id },
+          omit: { status: true },
           include: taskInclude,
         });
         if (before.columnId !== moved.columnId) {
@@ -335,6 +343,7 @@ export class TasksService {
     await this.lockTask(tx, taskId);
     return tx.task.findUniqueOrThrow({
       where: { id: taskId },
+      omit: { status: true },
       include: taskInclude,
     });
   }
