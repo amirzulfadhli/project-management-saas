@@ -60,6 +60,21 @@ Backend runtime:
 | `FRONTEND_URL`                             | Exact public HTTPS frontend origin                            |
 | `PORT`                                     | Optional validated port; defaults to `3001`                   |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | Optional; configure both or neither                           |
+| `GITHUB_WEBHOOK_SECRET`                    | Optional; 32+ characters when GitHub webhooks are enabled     |
+| `GITHUB_APP_ID`                            | GitHub App numeric ID; required with all GitHub App variables |
+| `GITHUB_APP_SLUG`                          | Public App slug used by the installation URL                  |
+| `GITHUB_APP_CLIENT_ID`                     | GitHub App OAuth client ID (not Better Auth's provider ID)    |
+| `GITHUB_APP_CLIENT_SECRET`                 | GitHub App OAuth client secret                                |
+| `GITHUB_APP_PRIVATE_KEY`                   | RSA PEM; multiline or with literal `\\n` line breaks          |
+| `FLOWPLAN_STORAGE_DRIVER`                  | `local` for the current provider                              |
+| `FLOWPLAN_STORAGE_PATH`                    | Required absolute persistent upload root                      |
+
+GitHub App values are an all-or-nothing optional group. If any one is present,
+startup also requires the other four plus `GITHUB_WEBHOOK_SECRET`. Keep the
+private key, App client secret, and webhook secret in the deployment secret
+store; none are frontend variables or Docker build arguments. Better Auth's
+optional `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` remain independent sign-in
+credentials.
 
 Frontend build:
 
@@ -120,6 +135,10 @@ docker compose down
 
 The PostgreSQL volume is persistent. `docker compose down` stops resources;
 do not use `docker compose down -v` unless deleting local data is intentional.
+Compose also mounts `flowplan-uploads` at `/data/uploads`. It is independent of
+the image filesystem and survives restart and ordinary `docker compose down`.
+Back up both PostgreSQL and this upload volume as one logical application
+snapshot. Never expose the upload directory through the reverse proxy.
 
 The local production-like topology was verified on 2026-09-04: all three
 images built, PostgreSQL and both applications became healthy, the migration
@@ -183,6 +202,17 @@ runtime secrets through Coolify. Do not expose PostgreSQL publicly. If proxy
 behavior changes, verify that forwarded protocol/host headers and the Nest
 Better Auth request bridge still produce the public HTTPS origin.
 
+The reverse proxy must pass WebSocket upgrades and Socket.IO polling requests
+for the backend `/realtime` namespace. Deploy one backend replica for the
+current realtime implementation. Multiple replicas require a shared Socket.IO
+adapter (for example Redis) before traffic is load-balanced across them.
+
+The current local attachment provider likewise requires one backend instance
+with a persistent mounted path. Before horizontally scaling, implement the
+existing `FileStorage` interface with shared S3-compatible object storage and a
+coordinated migration of stored objects; no S3 credentials are part of the
+current repository.
+
 ## First-deployment smoke checklist
 
 - CI succeeds from clean `npm ci` installs.
@@ -191,11 +221,15 @@ Better Auth request bridge still produce the public HTTPS origin.
 - `/ready` returns 200 and returns 503 when database access is intentionally
   unavailable in staging.
 - Untrusted browser origins are rejected by CORS/Better Auth.
+- An authenticated Project page connects to `/realtime`, while an
+  unauthenticated or wrong-origin Socket.IO handshake is rejected.
 - Sign up, session retrieval, sign out, and session invalidation work over
   HTTPS in Chrome and Safari.
 - Create an Organization, Project, Column, and Task.
 - Assign/move/edit/delete a Task.
 - Add/edit/delete a Comment and inspect Project Activity.
+- Upload/download/delete a Project and Task attachment; verify it survives an
+  application-container restart.
 - Restart both application containers and verify sessions/data survive.
 - Confirm logs contain no secrets or raw credentials.
 

@@ -22,11 +22,16 @@ import {
   UpdateProjectColumnDto,
 } from './dto/project-column.dto';
 import { ProjectColumnsService } from './project-columns.service';
+import { RealtimeService } from '../realtime/realtime.service';
+import { RealtimeEventType } from '../realtime/realtime.types';
 
 @UseGuards(AuthGuard)
 @Controller('api/projects/:projectId/columns')
 export class ProjectColumnsController {
-  constructor(private readonly projectColumnsService: ProjectColumnsService) {}
+  constructor(
+    private readonly projectColumnsService: ProjectColumnsService,
+    private readonly realtime: RealtimeService,
+  ) {}
 
   @Get()
   findAll(
@@ -39,18 +44,30 @@ export class ProjectColumnsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(
+  async create(
     @CurrentUser() user: AuthenticatedUser,
     @Param('projectId', new ZodValidationPipe(projectColumnIdSchema))
     projectId: string,
     @Body(new ZodValidationPipe(createProjectColumnSchema))
     dto: CreateProjectColumnDto,
   ) {
-    return this.projectColumnsService.create(user.id, projectId, dto);
+    const column = await this.projectColumnsService.create(
+      user.id,
+      projectId,
+      dto,
+    );
+    await this.realtime.publish({
+      projectId,
+      type: RealtimeEventType.COLUMN_CREATED,
+      entity: 'column',
+      entityId: column.id,
+      actorId: user.id,
+    });
+    return column;
   }
 
   @Patch(':columnId')
-  update(
+  async update(
     @CurrentUser() user: AuthenticatedUser,
     @Param('projectId', new ZodValidationPipe(projectColumnIdSchema))
     projectId: string,
@@ -59,7 +76,20 @@ export class ProjectColumnsController {
     @Body(new ZodValidationPipe(updateProjectColumnSchema))
     dto: UpdateProjectColumnDto,
   ) {
-    return this.projectColumnsService.update(user.id, projectId, columnId, dto);
+    const column = await this.projectColumnsService.update(
+      user.id,
+      projectId,
+      columnId,
+      dto,
+    );
+    await this.realtime.publish({
+      projectId,
+      type: RealtimeEventType.COLUMN_RENAMED,
+      entity: 'column',
+      entityId: columnId,
+      actorId: user.id,
+    });
+    return column;
   }
 
   @Delete(':columnId')
@@ -72,5 +102,12 @@ export class ProjectColumnsController {
     columnId: string,
   ) {
     await this.projectColumnsService.remove(user.id, projectId, columnId);
+    await this.realtime.publish({
+      projectId,
+      type: RealtimeEventType.COLUMN_DELETED,
+      entity: 'column',
+      entityId: columnId,
+      actorId: user.id,
+    });
   }
 }

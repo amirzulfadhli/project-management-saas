@@ -4,6 +4,11 @@ import type { AccessService } from '../access/access.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import { ProjectMembersService } from './project-members.service';
 import type { ActivitiesService } from '../activities/activities.service';
+import type { NotificationsService } from '../notifications/notifications.service';
+
+jest.mock('../realtime/realtime.service', () => ({
+  RealtimeService: class RealtimeService {},
+}));
 
 describe('ProjectMembersService', () => {
   const projectId = '10000000-0000-4000-8000-000000000001';
@@ -13,7 +18,7 @@ describe('ProjectMembersService', () => {
 
   let transaction: {
     $queryRaw: jest.Mock<Promise<Array<{ id: string }>>, [Prisma.Sql]>;
-    project: { findUnique: jest.Mock };
+    project: { findUnique: jest.Mock; findUniqueOrThrow: jest.Mock };
     projectMember: {
       create: jest.Mock;
       findFirst: jest.Mock;
@@ -37,9 +42,11 @@ describe('ProjectMembersService', () => {
         .fn<Promise<Array<{ id: string }>>, [Prisma.Sql]>()
         .mockResolvedValue([{ id: projectId }]),
       project: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ organizationId: 'organization-1' }),
+        findUnique: jest.fn().mockResolvedValue({
+          organizationId: 'organization-1',
+          name: 'Project',
+        }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ name: 'Project' }),
       },
       projectMember: {
         create: jest.fn().mockResolvedValue({
@@ -85,6 +92,10 @@ describe('ProjectMembersService', () => {
       prisma,
       access as unknown as AccessService,
       { record: jest.fn() } as unknown as ActivitiesService,
+      {
+        recordMembershipChange: jest.fn().mockResolvedValue([]),
+        publishCreated: jest.fn(),
+      } as unknown as NotificationsService,
     );
   });
 

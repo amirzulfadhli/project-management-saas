@@ -21,13 +21,25 @@ Browser -> Next.js frontend -> NestJS API -> PostgreSQL
 ## Implemented product scope
 
 - Email/password authentication and cookie-backed sessions
-- Organization onboarding and workspace selection
+- Organization onboarding, workspace selection, and OWNER/MEMBER
+  administration for existing FlowPlan users
 - Organization-scoped Project lifecycle
 - Project membership roles and administration
 - Single-board Kanban workflow with managed Columns
-- Task creation, editing, assignment, movement, and permanent deletion
+- Task creation, editing, assignment, ordered drag-and-drop movement, and
+  permanent deletion
 - Project Activity feed
 - Task Comments, replies, editing, moderation, and tombstones
+- Authenticated Project and Task file attachments with private downloads,
+  Activity history, and realtime cache reconciliation
+- Project documentation with bounded hierarchy and safely rendered Markdown
+- Task timers, manual time entries, and Project time summaries with private
+  user history and owner-authorized aggregate breakdowns
+- Private persistent Notifications with unread state and realtime delivery
+- Authenticated Project-scoped realtime cache reconciliation for collaborative
+  Project, Task, Column, Comment, membership, and repository changes
+- GitHub App installation, verified repository discovery/connection, signed
+  webhook ingestion, and Project-level connection management UI
 
 ## Local development
 
@@ -64,7 +76,7 @@ runs those checks from clean installs.
 
 The repository root is this directory. From a clean clone, both applications
 use their committed `package-lock.json` files through `npm ci`; Prisma Client is
-generated rather than committed, and all seven production migrations remain in
+generated rather than committed, and all fifteen production migrations remain in
 source control. GitHub Actions uses only disposable CI configuration and a
 PostgreSQL service—no production or staging secrets are required.
 
@@ -76,11 +88,18 @@ staging deployment.
 
 ## Known limitations
 
-- Organization invitations and administration are not implemented.
-- Column and Task ordering/drag-and-drop are not implemented.
+- Email invitations are not implemented; Organization owners can administer
+  existing FlowPlan users with the current OWNER/MEMBER model.
+- Column reordering is not implemented. Realtime delivery currently targets a
+  single backend instance; multiple instances require a shared Socket.IO
+  adapter.
+- Attachments currently use one persistent local filesystem volume. Horizontal
+  backend scaling requires a shared object-storage provider and object migration.
 - Project access intentionally includes Organization-level inherited access.
-- GitHub repository integration, Notifications, realtime updates, Wiki,
-  Calendar, AI features, Teams, and advanced RBAC are future work.
+- Live GitHub App verification, issue sync, presence, Calendar, AI features,
+  Teams, and advanced RBAC are future work. Wiki rich text, version history,
+  and live character-level collaboration are intentionally not part of the
+  current Markdown documentation core.
 - `backend/project-management-saas/` is a preserved legacy starter copy. It is
   excluded from repository and container contexts and is not part of either
   active application.

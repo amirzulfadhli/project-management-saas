@@ -37,8 +37,18 @@ services:
       DATABASE_URL: postgresql://flowplan:${POSTGRES_PASSWORD}@postgres:5432/flowplan?schema=public
       BETTER_AUTH_URL: ${PUBLIC_BACKEND_URL:-http://localhost:3001}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Set BETTER_AUTH_SECRET in the root .env file}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_SLUG: ${GITHUB_APP_SLUG:-}
+      GITHUB_APP_CLIENT_ID: ${GITHUB_APP_CLIENT_ID:-}
+      GITHUB_APP_CLIENT_SECRET: ${GITHUB_APP_CLIENT_SECRET:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
       FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-http://localhost:3000}
+      FLOWPLAN_STORAGE_DRIVER: ${FLOWPLAN_STORAGE_DRIVER:-local}
+      FLOWPLAN_STORAGE_PATH: ${FLOWPLAN_STORAGE_PATH:-/data/uploads}
       PORT: 3001
+    volumes:
+      - flowplan-uploads:${FLOWPLAN_STORAGE_PATH:-/data/uploads}
     ports:
       - "${BACKEND_PORT:-3001}:3001"
     depends_on:
@@ -64,3 +74,4 @@ services:
 
 volumes:
   flowplan-postgres:
+  flowplan-uploads:

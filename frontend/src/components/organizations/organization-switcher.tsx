@@ -5,11 +5,8 @@ import { Select } from "@/components/ui/select";
 import { useOrganization } from "./organization-provider";
 
 export function OrganizationSwitcher() {
-  const {
-    organizations,
-    selectedOrganizationId,
-    selectOrganization,
-  } = useOrganization();
+  const { organizations, selectedOrganizationId, selectOrganization } =
+    useOrganization();
 
   if (organizations.length === 0) {
     return (
@@ -26,7 +23,7 @@ export function OrganizationSwitcher() {
     <div className="flex items-center gap-2">
       <Select
         aria-label="Current organization"
-        className="min-w-40 max-w-56"
+        className="w-32 min-w-0 sm:w-auto sm:min-w-40 sm:max-w-56"
         value={selectedOrganizationId ?? ""}
         onChange={(event) => selectOrganization(event.target.value)}
       >

@@ -4,7 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, ProjectRole } from '../../generated/prisma/client';
+import {
+  OrganizationRole,
+  Prisma,
+  ProjectRole,
+} from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 type AccessDatabaseClient = PrismaService | Prisma.TransactionClient;
@@ -21,19 +25,43 @@ export class AccessService {
   async assertOrganizationMember(
     userId: string,
     organizationId: string,
+    database: AccessDatabaseClient = this.prisma,
   ): Promise<void> {
-    const organization = await this.prisma.organization.findUnique({
+    const organization = await database.organization.findUnique({
       where: { id: organizationId },
-      include: { members: { where: { userId } } },
+      select: { members: { where: { userId }, select: { id: true } } },
     });
 
     if (!organization) {
       throw new NotFoundException('Organization not found');
     }
 
-    if (organization.ownerId !== userId && organization.members.length === 0) {
+    if (organization.members.length === 0) {
       throw new ForbiddenException(
         'You do not have access to this organization',
+      );
+    }
+  }
+
+  async assertOrganizationOwner(
+    userId: string,
+    organizationId: string,
+    database: AccessDatabaseClient = this.prisma,
+  ): Promise<void> {
+    const organization = await database.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        members: {
+          where: { userId, role: OrganizationRole.OWNER },
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!organization) throw new NotFoundException('Organization not found');
+    if (organization.members.length === 0) {
+      throw new ForbiddenException(
+        'You cannot administer this Organization membership',
       );
     }
   }
@@ -55,9 +83,7 @@ export class AccessService {
       throw new NotFoundException('Project not found');
     }
 
-    const hasOrgAccess =
-      project.organization.ownerId === userId ||
-      project.organization.members.length > 0;
+    const hasOrgAccess = project.organization.members.length > 0;
     const isProjectMember = project.projectMembers.length > 0;
 
     if (!hasOrgAccess && !isProjectMember) {
@@ -81,7 +107,14 @@ export class AccessService {
     const project = await database.project.findUnique({
       where: { id: projectId },
       select: {
-        organization: { select: { ownerId: true } },
+        organization: {
+          select: {
+            members: {
+              where: { userId, role: OrganizationRole.OWNER },
+              select: { id: true },
+            },
+          },
+        },
         projectMembers: {
           where: { userId },
           select: { role: true },
@@ -93,7 +126,7 @@ export class AccessService {
       throw new NotFoundException('Project not found');
     }
 
-    const isOrganizationOwner = project.organization.ownerId === userId;
+    const isOrganizationOwner = project.organization.members.length > 0;
     const isProjectOwner = project.projectMembers.some(
       (member) => member.role === ProjectRole.OWNER,
     );
@@ -102,6 +135,82 @@ export class AccessService {
       throw new ForbiddenException(
         'You cannot administer this project membership',
       );
+    }
+  }
+
+  /**
+   * Repository connections change a Project-level integration boundary, so
+   * they use the same narrow authority as membership administration without
+   * coupling callers to membership-specific error wording.
+   */
+  async assertProjectIntegrationAdmin(
+    userId: string,
+    projectId: string,
+    database: AccessDatabaseClient = this.prisma,
+  ): Promise<void> {
+    const project = await database.project.findUnique({
+      where: { id: projectId },
+      select: {
+        organization: {
+          select: {
+            members: {
+              where: { userId, role: OrganizationRole.OWNER },
+              select: { id: true },
+            },
+          },
+        },
+        projectMembers: {
+          where: { userId },
+          select: { role: true },
+        },
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const isOrganizationOwner = project.organization.members.length > 0;
+    const isProjectOwner = project.projectMembers.some(
+      (member) => member.role === ProjectRole.OWNER,
+    );
+
+    if (!isOrganizationOwner && !isProjectOwner) {
+      throw new ForbiddenException(
+        'You cannot administer this project integration',
+      );
+    }
+  }
+
+  /** Owner-level Project authority used for destructive Project resources. */
+  async assertProjectOwnerAuthority(
+    userId: string,
+    projectId: string,
+    database: AccessDatabaseClient = this.prisma,
+  ): Promise<void> {
+    const project = await database.project.findUnique({
+      where: { id: projectId },
+      select: {
+        organization: {
+          select: {
+            members: {
+              where: { userId, role: OrganizationRole.OWNER },
+              select: { id: true },
+            },
+          },
+        },
+        projectMembers: {
+          where: { userId, role: ProjectRole.OWNER },
+          select: { id: true },
+        },
+      },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+    if (
+      project.organization.members.length === 0 &&
+      project.projectMembers.length === 0
+    ) {
+      throw new ForbiddenException('You cannot administer this Project');
     }
   }
 
@@ -114,10 +223,6 @@ export class AccessService {
     const user = await database.user.findUnique({
       where: { id: userId },
       select: {
-        ownedOrganizations: {
-          where: { id: organizationId },
-          select: { id: true },
-        },
         organizationMembers: {
           where: { organizationId },
           select: { id: true },
@@ -129,10 +234,7 @@ export class AccessService {
       throw new NotFoundException('User not found');
     }
 
-    if (
-      user.ownedOrganizations.length === 0 &&
-      user.organizationMembers.length === 0
-    ) {
+    if (user.organizationMembers.length === 0) {
       throw new BadRequestException(
         'User must belong to the project organization',
       );

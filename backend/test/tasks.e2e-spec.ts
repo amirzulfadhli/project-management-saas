@@ -23,6 +23,7 @@ interface TaskResponse {
   reporterId: string;
   priority: number;
   status: string;
+  position: number;
   dueDate: string | null;
   column: { id: string; name: string; position: number };
   project: { id: string; name: string };
@@ -93,6 +94,9 @@ describe('Task core lifecycle (e2e)', () => {
       ].filter((id): id is string => Boolean(id));
 
       if (projectIds.length > 0) {
+        await prisma.notification.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
         await prisma.activity.deleteMany({
           where: { projectId: { in: projectIds } },
         });
@@ -176,6 +180,13 @@ describe('Task core lifecycle (e2e)', () => {
         title: 'No session',
         projectId: projectA.id,
         columnId: projectA.board.columns[0].id,
+      })
+      .expect(401);
+    await unauthenticated
+      .patch('/api/tasks/00000000-0000-4000-8000-000000000000/move')
+      .send({
+        columnId: projectA.board.columns[0].id,
+        targetIndex: 0,
       })
       .expect(401);
   });
@@ -348,6 +359,143 @@ describe('Task core lifecycle (e2e)', () => {
     expect(unchanged?.columnId).toBe(projectA.board.columns[0].id);
   });
 
+  it('appends, reorders, moves, and normalizes Task positions atomically', async () => {
+    const sourceColumn = (
+      await ownerClient
+        .post(`/api/projects/${projectA.id}/columns`)
+        .send({ name: 'Ordering Source' })
+        .expect(201)
+    ).body as { id: string };
+    const targetColumn = (
+      await ownerClient
+        .post(`/api/projects/${projectA.id}/columns`)
+        .send({ name: 'Ordering Target' })
+        .expect(201)
+    ).body as { id: string };
+
+    const createResponses = await Promise.all(
+      Array.from({ length: 5 }, (_, index) =>
+        ownerClient.post('/api/tasks').send({
+          title: `Ordered ${index}`,
+          projectId: projectA.id,
+          columnId: sourceColumn.id,
+        }),
+      ),
+    );
+    expect(createResponses.every((response) => response.status === 201)).toBe(
+      true,
+    );
+    const created = createResponses.map(
+      (response) => response.body as TaskResponse,
+    );
+    const initial = await orderedTasks(sourceColumn.id);
+    expect(initial.map((task) => task.position)).toEqual([0, 1, 2, 3, 4]);
+
+    const last = initial[4];
+    await ownerClient
+      .patch(`/api/tasks/${last.id}/move`)
+      .send({ columnId: sourceColumn.id, targetIndex: 0 })
+      .expect(200)
+      .expect(({ body }) => {
+        expect((body as TaskResponse).position).toBe(0);
+      });
+    expect((await orderedTasks(sourceColumn.id))[0].id).toBe(last.id);
+
+    const middle = (await orderedTasks(sourceColumn.id))[1];
+    await ownerClient
+      .patch(`/api/tasks/${middle.id}/move`)
+      .send({ columnId: sourceColumn.id, targetIndex: 4 })
+      .expect(200);
+    expect((await orderedTasks(sourceColumn.id))[4].id).toBe(middle.id);
+
+    const activityBeforeNoop = await prisma.activity.count({
+      where: { projectId: projectA.id },
+    });
+    const unchanged = (await orderedTasks(sourceColumn.id))[2];
+    await ownerClient
+      .patch(`/api/tasks/${unchanged.id}/move`)
+      .send({ columnId: sourceColumn.id, targetIndex: 2 })
+      .expect(200);
+    expect(
+      await prisma.activity.count({ where: { projectId: projectA.id } }),
+    ).toBe(activityBeforeNoop);
+
+    const moved = (await orderedTasks(sourceColumn.id))[1];
+    await ownerClient
+      .patch(`/api/tasks/${moved.id}/move`)
+      .send({ columnId: targetColumn.id, targetIndex: 0 })
+      .expect(200);
+    expect(
+      (await orderedTasks(targetColumn.id)).map((task) => task.id),
+    ).toEqual([moved.id]);
+    expect(
+      (await orderedTasks(sourceColumn.id)).map((task) => task.position),
+    ).toEqual([0, 1, 2, 3]);
+
+    const sourceBeforeRejectedMove = await orderedTasks(sourceColumn.id);
+    await Promise.all([
+      ownerClient
+        .patch(`/api/tasks/${sourceBeforeRejectedMove[0].id}/move`)
+        .send({ columnId: sourceColumn.id, targetIndex: 999 })
+        .expect(400),
+      ownerClient
+        .patch(`/api/tasks/${sourceBeforeRejectedMove[0].id}/move`)
+        .send({
+          columnId: sourceColumn.id,
+          targetIndex: 0,
+          position: 4,
+        })
+        .expect(400),
+      ownerClient
+        .patch(`/api/tasks/${sourceBeforeRejectedMove[0].id}/move`)
+        .send({ columnId: projectB.board.columns[0].id, targetIndex: 0 })
+        .expect(400),
+      outsiderClient
+        .patch(`/api/tasks/${sourceBeforeRejectedMove[0].id}/move`)
+        .send({ columnId: sourceColumn.id, targetIndex: 0 })
+        .expect(403),
+    ]);
+
+    const concurrentCandidates = (await orderedTasks(sourceColumn.id)).slice(
+      0,
+      2,
+    );
+    const concurrentMoves = await Promise.all(
+      concurrentCandidates.map((task) =>
+        ownerClient
+          .patch(`/api/tasks/${task.id}/move`)
+          .send({ columnId: targetColumn.id, targetIndex: 0 }),
+      ),
+    );
+    expect(concurrentMoves.every((response) => response.status === 200)).toBe(
+      true,
+    );
+    const sourceAfterConcurrent = await orderedTasks(sourceColumn.id);
+    const targetAfterConcurrent = await orderedTasks(targetColumn.id);
+    expectDensePositions(sourceAfterConcurrent);
+    expectDensePositions(targetAfterConcurrent);
+    expect(
+      new Set(
+        [...sourceAfterConcurrent, ...targetAfterConcurrent].map(
+          (task) => task.id,
+        ),
+      ).size,
+    ).toBe(created.length);
+
+    const deleteCandidate = targetAfterConcurrent[1];
+    await ownerClient.delete(`/api/tasks/${deleteCandidate.id}`).expect(204);
+    expectDensePositions(await orderedTasks(targetColumn.id));
+
+    const listed = (
+      await ownerClient
+        .get(`/api/tasks?projectId=${projectA.id}&columnId=${sourceColumn.id}`)
+        .expect(200)
+    ).body as TaskResponse[];
+    expect(listed.map((task) => task.id)).toEqual(
+      (await orderedTasks(sourceColumn.id)).map((task) => task.id),
+    );
+  });
+
   it('isolates Project lists and validates Project/Column filter pairs', async () => {
     const taskA = await createTask(projectA, 'Project A Task');
     const taskB = await createTask(projectB, 'Project B Task');
@@ -384,4 +532,18 @@ describe('Task core lifecycle (e2e)', () => {
     await ownerClient.get('/api/tasks/' + task.id).expect(404);
     expect(await prisma.task.findUnique({ where: { id: task.id } })).toBeNull();
   });
+
+  async function orderedTasks(columnId: string) {
+    return prisma.task.findMany({
+      where: { columnId },
+      orderBy: [{ position: 'asc' }, { id: 'asc' }],
+      select: { id: true, position: true },
+    });
+  }
+
+  function expectDensePositions(tasks: Array<{ position: number }>) {
+    expect(tasks.map((task) => task.position)).toEqual(
+      tasks.map((_task, index) => index),
+    );
+  }
 });

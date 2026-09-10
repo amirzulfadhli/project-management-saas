@@ -18,29 +18,33 @@ enum ProjectRole {
 }
 
 model User {
-  id                  String               @id @default(uuid())
-  email               String               @unique
-  emailVerified       Boolean              @default(false)
-  name                String
-  image               String?
-  password            String?
-  role                String               @default("member")
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  accounts            Account[]
-  activities          Activity[]           @relation("ActivityUser")
-  apiTokens           ApiToken[]
-  comments            Comment[]            @relation("CommentAuthor")
-  files               File[]               @relation("FileUser")
-  notifications       Notification[]
-  ownedOrganizations  Organization[]       @relation("OrganizationOwner")
-  organizationMembers OrganizationMember[]
-  projectMembers      ProjectMember[]
-  sessions            Session[]
-  assignedTasks       Task[]               @relation("TaskAssignee")
-  reportedTasks       Task[]               @relation("TaskReporter")
-  teamMembers         TeamMember[]
-  timeLogs            TimeLog[]            @relation("TimeLogUser")
+  id                    String               @id @default(uuid())
+  email                 String               @unique
+  emailVerified         Boolean              @default(false)
+  name                  String
+  image                 String?
+  password              String?
+  role                  String               @default("member")
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  accounts              Account[]
+  activities            Activity[]           @relation("ActivityUser")
+  apiTokens             ApiToken[]
+  comments              Comment[]            @relation("CommentAuthor")
+  files                 File[]               @relation("FileUser")
+  createdWikiPages      WikiPage[]           @relation("WikiPageCreator")
+  receivedNotifications Notification[]       @relation("NotificationRecipient")
+  sentNotifications     Notification[]       @relation("NotificationActor")
+  ownedOrganizations    Organization[]       @relation("OrganizationOwner")
+  organizationMembers   OrganizationMember[]
+  projectMembers        ProjectMember[]
+  sessions              Session[]
+  assignedTasks         Task[]               @relation("TaskAssignee")
+  reportedTasks         Task[]               @relation("TaskReporter")
+  teamMembers           TeamMember[]
+  timeEntries           TimeEntry[]          @relation("TimeEntryUser")
+  githubInstallations   GithubInstallation[] @relation("GithubInstallationConnector")
+  githubAppStates       GithubAppState[]
 }
 
 model Organization {
@@ -94,24 +98,27 @@ model TeamMember {
 }
 
 model Project {
-  id             String          @id @default(uuid())
-  name           String
-  description    String?
-  organizationId String
-  teamId         String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  archivedAt     DateTime?
-  activities     Activity[]      @relation("ActivityProject")
-  board          Board?          @relation("ProjectBoard")
-  columns        Column[]
-  files          File[]          @relation("FileProject")
-  organization   Organization    @relation(fields: [organizationId], references: [id])
-  team           Team?           @relation("ProjectTeams", fields: [teamId], references: [id])
-  projectMembers ProjectMember[]
-  repository     Repository?
-  tasks          Task[]
-  wiki           Wiki?           @relation("WikiProject")
+  id                      String                  @id @default(uuid())
+  name                    String
+  description             String?
+  organizationId          String
+  teamId                  String?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  archivedAt              DateTime?
+  activities              Activity[]              @relation("ActivityProject")
+  board                   Board?                  @relation("ProjectBoard")
+  columns                 Column[]
+  files                   File[]                  @relation("FileProject")
+  organization            Organization            @relation(fields: [organizationId], references: [id])
+  team                    Team?                   @relation("ProjectTeams", fields: [teamId], references: [id])
+  projectMembers          ProjectMember[]
+  repository              Repository?
+  githubWebhookDeliveries GithubWebhookDelivery[]
+  tasks                   Task[]
+  wikiPages               WikiPage[]              @relation("WikiPageProject")
+  notifications           Notification[]          @relation("NotificationProject")
+  timeEntries             TimeEntry[]              @relation("TimeEntryProject")
 
   @@index([organizationId, archivedAt])
 }
@@ -159,6 +166,7 @@ model Task {
   reporterId        String
   priority          Int             @default(1)
   status            String          @default("todo")
+  position          Int
   dueDate           DateTime?
   estimatedTime     Int?
   actualTime        Int?
@@ -182,11 +190,11 @@ model Task {
   column            Column          @relation(fields: [columnId], references: [id])
   project           Project         @relation(fields: [projectId], references: [id])
   reporter          User            @relation("TaskReporter", fields: [reporterId], references: [id])
-  timeLogs          TimeLog[]
+  timeEntries       TimeEntry[]
   pullRequests      PullRequest[]   @relation("PullRequestTasks")
 
+  @@unique([columnId, position], name: "Task_columnId_position_key")
   @@index([projectId, createdAt])
-  @@index([columnId])
 }
 
 model Subtask {
@@ -234,56 +242,133 @@ model Activity {
 }
 
 model Notification {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   type       String
-  title      String
-  message    String
-  isRead     Boolean  @default(false)
   userId     String
+  projectId  String
+  actorId    String
+  entityType String
   entityId   String?
-  entityType String?
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id])
+  metadata   Json?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation("NotificationRecipient", fields: [userId], references: [id], onDelete: Restrict)
+  actor      User      @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Restrict)
+  project    Project   @relation("NotificationProject", fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt, id])
+  @@index([userId, readAt, createdAt])
+  @@index([projectId, createdAt])
 }
 
 model File {
   id           String   @id @default(uuid())
-  name         String
-  url          String
+  originalName String   @map("name")
+  storageKey   String   @unique @map("url")
   mimeType     String
-  size         Int
+  sizeBytes    Int      @map("size")
   taskId       String?
-  projectId    String?
-  uploadedById String
+  projectId    String
+  uploaderId   String   @map("uploadedById")
   createdAt    DateTime @default(now())
-  project      Project? @relation("FileProject", fields: [projectId], references: [id])
-  task         Task?    @relation("FileTask", fields: [taskId], references: [id])
-  user         User     @relation("FileUser", fields: [uploadedById], references: [id])
+  project      Project  @relation("FileProject", fields: [projectId], references: [id], onDelete: Restrict)
+  task         Task?    @relation("FileTask", fields: [taskId], references: [id], onDelete: SetNull)
+  uploader     User     @relation("FileUser", fields: [uploaderId], references: [id], onDelete: Restrict)
+
+  @@index([projectId, createdAt, id])
+  @@index([taskId, createdAt, id])
 }
 
-model Wiki {
-  id        String   @id @default(uuid())
-  title     String
-  content   String?
-  projectId String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project   Project  @relation("WikiProject", fields: [projectId], references: [id])
+model WikiPage {
+  id          String     @id @default(uuid())
+  title       String
+  content     String     @default("")
+  projectId   String
+  parentId    String?
+  position    Int        @default(0)
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  project     Project    @relation("WikiPageProject", fields: [projectId], references: [id], onDelete: Restrict)
+  creator     User       @relation("WikiPageCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  parent      WikiPage?  @relation("WikiPageHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children    WikiPage[] @relation("WikiPageHierarchy")
+
+  @@index([projectId, parentId, position, id])
+  @@index([createdById])
+  @@map("Wiki")
 }
 
 model Repository {
-  id          String        @id @default(uuid())
-  name        String
-  fullName    String
-  provider    String
-  url         String
-  projectId   String?       @unique
-  webhookId   String?
-  branch      Branch[]
-  issue       Issue[]
-  pullRequest PullRequest[]
-  project     Project?      @relation(fields: [projectId], references: [id])
-  webhook     Webhook?      @relation("WebhookRepository")
+  id                   String                  @id @default(uuid())
+  name                 String
+  fullName             String
+  provider             String
+  url                  String
+  externalRepositoryId String?
+  owner                String?
+  defaultBranch        String?
+  projectId            String?                 @unique
+  webhookId            String?
+  githubInstallationId String?
+  connectedAt          DateTime                @default(now())
+  updatedAt            DateTime                @default(now()) @updatedAt
+  branch               Branch[]
+  issue                Issue[]
+  pullRequest          PullRequest[]
+  project              Project?                @relation(fields: [projectId], references: [id])
+  webhook              Webhook?                @relation("WebhookRepository")
+  webhookDeliveries    GithubWebhookDelivery[]
+  githubInstallation   GithubInstallation?     @relation(fields: [githubInstallationId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, externalRepositoryId])
+  @@index([githubInstallationId])
+}
+
+model GithubInstallation {
+  id                     String       @id @default(uuid())
+  externalInstallationId String       @unique
+  accountLogin           String
+  accountId              String
+  accountType            String
+  connectedById          String
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  connectedBy            User         @relation("GithubInstallationConnector", fields: [connectedById], references: [id], onDelete: Restrict)
+  repositories           Repository[]
+
+  @@index([connectedById, createdAt])
+}
+
+model GithubAppState {
+  id                    String    @id @default(uuid())
+  stateHash             String    @unique
+  codeVerifier          String
+  pendingInstallationId String?
+  userId                String
+  expiresAt             DateTime
+  consumedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model GithubWebhookDelivery {
+  id           String      @id @default(uuid())
+  deliveryId   String      @unique
+  eventType    String
+  status       String
+  metadata     Json?
+  projectId    String
+  repositoryId String?
+  receivedAt   DateTime    @default(now())
+  processedAt  DateTime?
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  repository   Repository? @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, receivedAt])
+  @@index([repositoryId, receivedAt])
 }
 
 model Issue {
@@ -384,17 +469,27 @@ model Verification {
   @@index([identifier])
 }
 
-model TimeLog {
-  id          String    @id @default(uuid())
-  taskId      String
-  userId      String
-  startTime   DateTime
-  endTime     DateTime?
-  duration    Int?
-  description String?
-  createdAt   DateTime  @default(now())
-  task        Task      @relation(fields: [taskId], references: [id])
-  user        User      @relation("TimeLogUser", fields: [userId], references: [id])
+model TimeEntry {
+  id              String    @id @default(uuid())
+  projectId       String
+  taskId          String
+  userId          String
+  startedAt       DateTime  @map("startTime") @db.Timestamptz(3)
+  endedAt         DateTime? @map("endTime") @db.Timestamptz(3)
+  durationSeconds Int?      @map("duration")
+  note            String?   @map("description")
+  activeMarker    Boolean?
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+  project         Project   @relation("TimeEntryProject", fields: [projectId], references: [id], onDelete: Restrict)
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user            User      @relation("TimeEntryUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, activeMarker], name: "TimeEntry_userId_activeMarker_key", map: "TimeEntry_userId_activeMarker_key")
+  @@index([taskId, startedAt, id])
+  @@index([projectId, startedAt, id])
+  @@index([userId, startedAt, id])
+  @@map("TimeLog")
 }
 
 model ChecklistItem {

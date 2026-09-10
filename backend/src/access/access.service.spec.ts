@@ -7,8 +7,49 @@ import { Prisma, ProjectRole } from '../../generated/prisma/client';
 import type { PrismaService } from '../prisma/prisma.service';
 import { AccessService } from './access.service';
 
+describe('AccessService Organization authorization', () => {
+  it('allows a member to read and an OWNER to administer', async () => {
+    const findUnique = jest
+      .fn()
+      .mockResolvedValueOnce({ members: [{ id: 'membership-1' }] })
+      .mockResolvedValueOnce({ members: [{ id: 'membership-1' }] });
+    const service = new AccessService({
+      organization: { findUnique },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.assertOrganizationMember('user-1', 'organization-1'),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.assertOrganizationOwner('user-1', 'organization-1'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('denies administration when no OWNER membership is returned', async () => {
+    const service = new AccessService({
+      organization: {
+        findUnique: jest.fn().mockResolvedValue({ members: [] }),
+      },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.assertOrganizationOwner('member-1', 'organization-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('reports a missing Organization without leaking membership state', async () => {
+    const service = new AccessService({
+      organization: { findUnique: jest.fn().mockResolvedValue(null) },
+    } as unknown as PrismaService);
+
+    await expect(
+      service.assertOrganizationMember('user-1', 'missing'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
 interface ProjectAdminRecord {
-  organization: { ownerId: string };
+  organization: { members: Array<{ id: string }> };
   projectMembers: Array<{ role: ProjectRole }>;
 }
 
@@ -31,7 +72,7 @@ describe('AccessService.assertProjectMembershipAdmin', () => {
 
   it('allows the Organization owner', async () => {
     projectFindUnique.mockResolvedValue({
-      organization: { ownerId: 'organization-owner' },
+      organization: { members: [{ id: 'owner-membership' }] },
       projectMembers: [],
     });
 
@@ -46,7 +87,7 @@ describe('AccessService.assertProjectMembershipAdmin', () => {
       [Prisma.ProjectFindUniqueArgs]
     >();
     transactionFindUnique.mockResolvedValue({
-      organization: { ownerId: 'organization-owner' },
+      organization: { members: [] },
       projectMembers: [{ role: ProjectRole.OWNER }],
     });
     const transaction = {
@@ -66,7 +107,7 @@ describe('AccessService.assertProjectMembershipAdmin', () => {
 
   it('denies an ordinary Organization MEMBER', async () => {
     projectFindUnique.mockResolvedValue({
-      organization: { ownerId: 'organization-owner' },
+      organization: { members: [] },
       projectMembers: [],
     });
 
@@ -77,7 +118,7 @@ describe('AccessService.assertProjectMembershipAdmin', () => {
 
   it('denies a Project MEMBER', async () => {
     projectFindUnique.mockResolvedValue({
-      organization: { ownerId: 'organization-owner' },
+      organization: { members: [] },
       projectMembers: [{ role: ProjectRole.MEMBER }],
     });
 
@@ -88,7 +129,7 @@ describe('AccessService.assertProjectMembershipAdmin', () => {
 
   it('denies an outsider', async () => {
     projectFindUnique.mockResolvedValue({
-      organization: { ownerId: 'organization-owner' },
+      organization: { members: [] },
       projectMembers: [],
     });
 
@@ -98,9 +139,64 @@ describe('AccessService.assertProjectMembershipAdmin', () => {
   });
 });
 
+describe('AccessService.assertProjectIntegrationAdmin', () => {
+  let service: AccessService;
+  let projectFindUnique: jest.Mock<
+    Promise<ProjectAdminRecord | null>,
+    [Prisma.ProjectFindUniqueArgs]
+  >;
+
+  beforeEach(() => {
+    projectFindUnique = jest.fn<
+      Promise<ProjectAdminRecord | null>,
+      [Prisma.ProjectFindUniqueArgs]
+    >();
+    service = new AccessService({
+      project: { findUnique: projectFindUnique },
+    } as unknown as PrismaService);
+  });
+
+  it('allows an Organization owner or explicit Project OWNER', async () => {
+    projectFindUnique
+      .mockResolvedValueOnce({
+        organization: { members: [{ id: 'owner-membership' }] },
+        projectMembers: [],
+      })
+      .mockResolvedValueOnce({
+        organization: { members: [] },
+        projectMembers: [{ role: ProjectRole.OWNER }],
+      });
+
+    await expect(
+      service.assertProjectIntegrationAdmin('organization-owner', 'project-1'),
+    ).resolves.toBeUndefined();
+    await expect(
+      service.assertProjectIntegrationAdmin('project-owner', 'project-1'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('denies ordinary members and outsiders', async () => {
+    projectFindUnique
+      .mockResolvedValueOnce({
+        organization: { members: [] },
+        projectMembers: [{ role: ProjectRole.MEMBER }],
+      })
+      .mockResolvedValueOnce({
+        organization: { members: [] },
+        projectMembers: [],
+      });
+
+    await expect(
+      service.assertProjectIntegrationAdmin('project-member', 'project-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      service.assertProjectIntegrationAdmin('outsider', 'project-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
 describe('AccessService.assertProspectiveProjectMember', () => {
   interface ProspectiveMemberRecord {
-    ownedOrganizations: Array<{ id: string }>;
     organizationMembers: Array<{ id: string }>;
   }
 
@@ -120,10 +216,9 @@ describe('AccessService.assertProspectiveProjectMember', () => {
     } as unknown as PrismaService);
   });
 
-  it('allows the Organization owner', async () => {
+  it('allows an Organization OWNER membership', async () => {
     userFindUnique.mockResolvedValue({
-      ownedOrganizations: [{ id: 'organization-1' }],
-      organizationMembers: [],
+      organizationMembers: [{ id: 'organization-owner-membership' }],
     });
 
     await expect(
@@ -137,7 +232,6 @@ describe('AccessService.assertProspectiveProjectMember', () => {
       [Prisma.UserFindUniqueArgs]
     >();
     transactionFindUnique.mockResolvedValue({
-      ownedOrganizations: [],
       organizationMembers: [{ id: 'organization-member-1' }],
     });
     const transaction = {
@@ -165,7 +259,6 @@ describe('AccessService.assertProspectiveProjectMember', () => {
 
   it('rejects an existing User outside the Organization', async () => {
     userFindUnique.mockResolvedValue({
-      ownedOrganizations: [],
       organizationMembers: [],
     });
 

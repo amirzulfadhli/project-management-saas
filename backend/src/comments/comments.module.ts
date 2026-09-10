@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { ActivitiesModule } from '../activities/activities.module';
 import { CommentsController } from './comments.controller';
 import { CommentsService } from './comments.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [ActivitiesModule],
+  imports: [ActivitiesModule, NotificationsModule],
   controllers: [CommentsController],
   providers: [CommentsService],
 })

@@ -37,6 +37,7 @@ ENV NODE_ENV=production
 ENV PORT=3001
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
+RUN mkdir -p /data/uploads && chown node:node /data/uploads
 USER node
 EXPOSE 3001
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \

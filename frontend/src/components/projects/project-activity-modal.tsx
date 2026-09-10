@@ -21,6 +21,7 @@ const categoryClasses: Record<ActivityCategory, string> = {
   task: "bg-success",
   member: "bg-purple",
   comment: "bg-warning",
+  integration: "bg-primary",
 };
 
 export function ProjectActivityModal({

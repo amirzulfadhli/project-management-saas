@@ -143,6 +143,9 @@ describe('Comments core backend (e2e)', () => {
       await prisma.comment.deleteMany({
         where: { task: { projectId: { in: projectIds } } },
       });
+      await prisma.notification.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
       await prisma.activity.deleteMany({
         where: {
           OR: [{ projectId: { in: projectIds } }, { userId: { in: userIds } }],

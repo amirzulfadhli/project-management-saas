@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { AccessService } from '../access/access.service';
@@ -86,5 +86,158 @@ describe('OrganizationsService', () => {
     await expect(
       service.create('u1', { name: 'Acme', slug: 'acme' }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('OrganizationsService membership administration', () => {
+  const organizationId = '11111111-1111-4111-8111-111111111111';
+  const memberId = '22222222-2222-4222-8222-222222222222';
+
+  function setup(txOverrides: Record<string, unknown> = {}) {
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: organizationId }]),
+      user: { findUnique: jest.fn() },
+      organization: { updateMany: jest.fn() },
+      organizationMember: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      project: { findMany: jest.fn().mockResolvedValue([]) },
+      ...txOverrides,
+    };
+    const prisma = {
+      $transaction: jest.fn(
+        (operation: (database: typeof tx) => Promise<unknown>) => operation(tx),
+      ),
+      organizationMember: { findMany: jest.fn() },
+    };
+    const access = {
+      assertOrganizationMember: jest.fn(),
+      assertOrganizationOwner: jest.fn(),
+    };
+    const service = new OrganizationsService(
+      prisma as unknown as PrismaService,
+      access as unknown as AccessService,
+    );
+    return { service, prisma, access, tx };
+  }
+
+  it('lists a scoped compact roster after an Organization access check', async () => {
+    const { service, prisma, access } = setup();
+    prisma.organizationMember.findMany.mockResolvedValue([{ id: memberId }]);
+
+    await expect(
+      service.findMembers('user-1', organizationId),
+    ).resolves.toEqual([{ id: memberId }]);
+    expect(access.assertOrganizationMember).toHaveBeenCalledWith(
+      'user-1',
+      organizationId,
+    );
+  });
+
+  it('adds an existing user as MEMBER inside the locked transaction', async () => {
+    const { service, access, tx } = setup();
+    tx.user.findUnique.mockResolvedValue({ id: 'target-1' });
+    tx.organizationMember.create.mockResolvedValue({
+      id: memberId,
+      role: OrganizationRole.MEMBER,
+    });
+
+    await expect(
+      service.addMember('owner-1', organizationId, {
+        email: 'target@example.test',
+      }),
+    ).resolves.toMatchObject({ id: memberId, role: OrganizationRole.MEMBER });
+    expect(access.assertOrganizationOwner).toHaveBeenCalled();
+    expect(tx.organizationMember.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          organizationId,
+          userId: 'target-1',
+          role: OrganizationRole.MEMBER,
+        },
+      }),
+    );
+  });
+
+  it('rejects missing and duplicate add targets cleanly', async () => {
+    const missing = setup();
+    missing.tx.user.findUnique.mockResolvedValue(null);
+    await expect(
+      missing.service.addMember('owner-1', organizationId, {
+        email: 'missing@example.test',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    const duplicate = setup();
+    duplicate.tx.user.findUnique.mockResolvedValue({ id: 'target-1' });
+    duplicate.tx.organizationMember.create.mockRejectedValue({ code: 'P2002' });
+    await expect(
+      duplicate.service.addMember('owner-1', organizationId, {
+        email: 'target@example.test',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('returns a same-role request without writing', async () => {
+    const { service, tx } = setup();
+    tx.organizationMember.findFirst.mockResolvedValue({
+      id: memberId,
+      userId: 'member-1',
+      role: OrganizationRole.MEMBER,
+    });
+    tx.organizationMember.findUniqueOrThrow.mockResolvedValue({
+      id: memberId,
+      role: OrganizationRole.MEMBER,
+    });
+
+    await service.updateMemberRole('owner-1', organizationId, memberId, {
+      role: OrganizationRole.MEMBER,
+    });
+    expect(tx.organizationMember.update).not.toHaveBeenCalled();
+  });
+
+  it('protects the final OWNER from demotion', async () => {
+    const { service, tx } = setup();
+    tx.organizationMember.findFirst
+      .mockResolvedValueOnce({
+        id: memberId,
+        userId: 'owner-1',
+        role: OrganizationRole.OWNER,
+      })
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      service.updateMemberRole('owner-1', organizationId, memberId, {
+        role: OrganizationRole.MEMBER,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.organizationMember.update).not.toHaveBeenCalled();
+  });
+
+  it('reassigns the primary owner and returns affected Projects on removal', async () => {
+    const { service, tx } = setup();
+    tx.organizationMember.findFirst
+      .mockResolvedValueOnce({
+        id: memberId,
+        userId: 'owner-1',
+        role: OrganizationRole.OWNER,
+      })
+      .mockResolvedValueOnce({ userId: 'owner-2' });
+    tx.project.findMany.mockResolvedValue([{ id: 'project-1' }]);
+
+    await expect(
+      service.removeMember('owner-1', organizationId, memberId),
+    ).resolves.toEqual(['project-1']);
+    expect(tx.organization.updateMany).toHaveBeenCalledWith({
+      where: { id: organizationId, ownerId: 'owner-1' },
+      data: { ownerId: 'owner-2' },
+    });
+    expect(tx.organizationMember.delete).toHaveBeenCalledWith({
+      where: { id: memberId },
+    });
   });
 });

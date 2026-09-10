@@ -21,12 +21,17 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Modal } from "@/components/ui/modal";
 import { Badge } from "@/components/ui/badge";
 import { useOrganization } from "@/components/organizations/organization-provider";
-import { TaskCard } from "@/components/tasks/task-card";
 import { TaskModal } from "@/components/tasks/task-modal";
+import { ProjectKanban } from "@/components/projects/project-kanban";
 import { ProjectColumnsModal } from "@/components/projects/project-columns-modal";
 import { ProjectMembersModal } from "@/components/projects/project-members-modal";
 import { ProjectActivityModal } from "@/components/projects/project-activity-modal";
+import { ProjectGithubModal } from "@/components/projects/project-github-modal";
+import { ProjectAttachmentsModal } from "@/components/attachments/project-attachments-modal";
+import { ProjectWikiModal } from "@/components/wiki/project-wiki-modal";
+import { ProjectTimeModal } from "@/components/time-tracking/project-time-modal";
 import { authClient } from "@/lib/auth-client";
+import { useProjectRealtime } from "@/lib/realtime";
 
 interface TaskModalState {
   open: boolean;
@@ -53,6 +58,10 @@ export function ProjectBoard({ id }: { id: string }) {
   const [membersOpen, setMembersOpen] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [githubOpen, setGithubOpen] = useState(false);
+  const [attachmentsOpen, setAttachmentsOpen] = useState(false);
+  const [wikiOpen, setWikiOpen] = useState(false);
+  const [timeOpen, setTimeOpen] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const project = useQuery({
@@ -68,6 +77,10 @@ export function ProjectBoard({ id }: { id: string }) {
   const projectContextIsReady =
     !projectOrganizationIsSelectable ||
     selectedOrganizationId === projectOrganizationId;
+  const realtimeStatus = useProjectRealtime(
+    currentProjectId,
+    Boolean(currentProjectId) && projectContextIsReady,
+  );
 
   const tasksQuery = useQuery({
     queryKey: queryKeys.tasks(currentProjectId ?? "none"),
@@ -140,23 +153,16 @@ export function ProjectBoard({ id }: { id: string }) {
     );
   }, [projectMembers, projectOrganizationId, selectedOrganization]);
   const currentUserId = session?.user.id ?? null;
-  const canModerateComments =
-    currentUserId === project.data?.organization.ownerId ||
+  const isOrganizationOwner =
+    selectedOrganization?.id === projectOrganizationId &&
+    selectedOrganization.members?.some(
+      (member) => member.userId === currentUserId && member.role === "OWNER",
+    );
+  const canAdministerProject =
+    Boolean(isOrganizationOwner) ||
     projectMembers.some(
       (member) => member.userId === currentUserId && member.role === "OWNER",
     );
-
-  // Group tasks by column id for stable board rendering.
-  const tasksByColumn = useMemo(() => {
-    const map = new Map<string, Task[]>();
-    for (const col of columns) map.set(col.id, []);
-    for (const task of tasksQuery.data ?? []) {
-      const bucket = map.get(task.columnId) ?? [];
-      bucket.push(task);
-      map.set(task.columnId, bucket);
-    }
-    return map;
-  }, [columns, tasksQuery.data]);
 
   const archive = useMutation({
     mutationFn: () => api.archiveProject(id),
@@ -230,6 +236,34 @@ export function ProjectBoard({ id }: { id: string }) {
           <Button
             variant="secondary"
             size="sm"
+            onClick={() => setTimeOpen(true)}
+          >
+            Time
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setWikiOpen(true)}
+          >
+            Docs
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setAttachmentsOpen(true)}
+          >
+            Files
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setGithubOpen(true)}
+          >
+            GitHub
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setActivityOpen(true)}
           >
             Activity
@@ -298,6 +332,16 @@ export function ProjectBoard({ id }: { id: string }) {
         </p>
       ) : null}
 
+      {realtimeStatus === "unavailable" ? (
+        <p
+          className="rounded-md border border-border bg-surface px-3 py-2 text-xs text-text-secondary"
+          role="status"
+        >
+          Live updates are temporarily unavailable. Your changes still save
+          normally; refresh to reconcile collaborators&apos; changes.
+        </p>
+      ) : null}
+
       {/* Board */}
       {columnsQuery.isError ? (
         <ErrorState
@@ -325,58 +369,19 @@ export function ProjectBoard({ id }: { id: string }) {
       ) : columns.length === 0 ? (
         <EmptyState title="This project has no board yet." />
       ) : (
-        <div className="flex-1 overflow-x-auto">
-          <div className="flex min-h-full items-start gap-3 pb-2">
-            {columns.map((col) => {
-              const tasks = tasksByColumn.get(col.id) ?? [];
-              return (
-                <div
-                  key={col.id}
-                  className="flex w-72 shrink-0 flex-col rounded-lg border border-border bg-background p-2"
-                >
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <h2 className="text-sm font-semibold text-text-primary">
-                      {col.name}
-                    </h2>
-                    <span className="text-xs text-text-secondary">
-                      {tasks.length}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-1 flex-col gap-2">
-                    {tasks.length === 0 ? (
-                      <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-text-secondary">
-                        No tasks
-                      </p>
-                    ) : (
-                      tasks.map((task) => (
-                        <TaskCard
-                          key={task.id}
-                          task={task}
-                          onClick={() => setTaskModal({ open: true, task })}
-                        />
-                      ))
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setTaskModal({
-                        open: true,
-                        task: null,
-                        defaultColumnId: col.id,
-                      })
-                    }
-                    className="mt-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-text-secondary hover:bg-hover hover:text-text-primary"
-                  >
-                    + Add task
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <ProjectKanban
+          projectId={data.id}
+          columns={columns}
+          tasks={tasksQuery.data ?? []}
+          onOpenTask={(task) => setTaskModal({ open: true, task })}
+          onCreateTask={(columnId) =>
+            setTaskModal({
+              open: true,
+              task: null,
+              defaultColumnId: columnId,
+            })
+          }
+        />
       )}
 
       {taskModal.open ? (
@@ -389,7 +394,7 @@ export function ProjectBoard({ id }: { id: string }) {
           defaultColumnId={taskModal.defaultColumnId}
           eligibleAssignees={eligibleAssignees}
           currentUserId={currentUserId}
-          canModerateComments={canModerateComments}
+          canModerateComments={canAdministerProject}
         />
       ) : null}
 
@@ -401,13 +406,48 @@ export function ProjectBoard({ id }: { id: string }) {
         />
       ) : null}
 
+      {attachmentsOpen ? (
+        <ProjectAttachmentsModal
+          open
+          onClose={() => setAttachmentsOpen(false)}
+          projectId={data.id}
+          currentUserId={currentUserId}
+          canAdminister={canAdministerProject}
+        />
+      ) : null}
+
+      {wikiOpen ? (
+        <ProjectWikiModal
+          open
+          onClose={() => setWikiOpen(false)}
+          projectId={data.id}
+          canAdminister={canAdministerProject}
+        />
+      ) : null}
+
+      {timeOpen ? (
+        <ProjectTimeModal
+          open
+          onClose={() => setTimeOpen(false)}
+          projectId={data.id}
+        />
+      ) : null}
+
+      {githubOpen ? (
+        <ProjectGithubModal
+          open
+          onClose={() => setGithubOpen(false)}
+          projectId={data.id}
+          canAdminister={canAdministerProject}
+        />
+      ) : null}
+
       {membersOpen ? (
         <ProjectMembersModal
           open
           onClose={() => setMembersOpen(false)}
           projectId={data.id}
           organizationId={data.organizationId}
-          organizationOwnerId={data.organization.ownerId}
         />
       ) : null}
 

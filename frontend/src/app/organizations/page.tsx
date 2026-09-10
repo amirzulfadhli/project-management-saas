@@ -4,17 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CreateOrganizationForm } from "@/components/organizations/create-organization-form";
+import { OrganizationMembersModal } from "@/components/organizations/organization-members-modal";
 import { useOrganization } from "@/components/organizations/organization-provider";
 import type { Organization } from "@/lib/types";
 
 export default function OrganizationsPage() {
   const router = useRouter();
-  const {
-    organizations,
-    selectedOrganizationId,
-    selectOrganization,
-  } = useOrganization();
+  const { organizations, selectedOrganizationId, selectOrganization } =
+    useOrganization();
   const [createdOrganization, setCreatedOrganization] =
+    useState<Organization | null>(null);
+  const [memberOrganization, setMemberOrganization] =
     useState<Organization | null>(null);
 
   function openWorkspace(organization: Organization) {
@@ -93,8 +93,7 @@ export default function OrganizationsPage() {
             </h2>
             <div className="mt-3 space-y-3">
               {organizations.map((organization) => {
-                const isSelected =
-                  organization.id === selectedOrganizationId;
+                const isSelected = organization.id === selectedOrganizationId;
                 return (
                   <article
                     key={organization.id}
@@ -128,12 +127,20 @@ export default function OrganizationsPage() {
                           </p>
                         ) : null}
                       </div>
-                      <Button
-                        variant={isSelected ? "primary" : "secondary"}
-                        onClick={() => openWorkspace(organization)}
-                      >
-                        Open
-                      </Button>
+                      <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                        <Button
+                          variant="secondary"
+                          onClick={() => setMemberOrganization(organization)}
+                        >
+                          Members
+                        </Button>
+                        <Button
+                          variant={isSelected ? "primary" : "secondary"}
+                          onClick={() => openWorkspace(organization)}
+                        >
+                          Open
+                        </Button>
+                      </div>
                     </div>
                   </article>
                 );
@@ -174,6 +181,14 @@ export default function OrganizationsPage() {
           <CreateOrganizationForm onCreated={handleCreated} />
         </section>
       </div>
+
+      {memberOrganization ? (
+        <OrganizationMembersModal
+          organizationId={memberOrganization.id}
+          organizationName={memberOrganization.name}
+          onClose={() => setMemberOrganization(null)}
+        />
+      ) : null}
     </div>
   );
 }

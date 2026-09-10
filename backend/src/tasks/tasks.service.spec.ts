@@ -4,7 +4,12 @@ import type { AccessService } from '../access/access.service';
 import type { ActivitiesService } from '../activities/activities.service';
 import { ActivityEvent } from '../activities/activity.types';
 import type { PrismaService } from '../prisma/prisma.service';
+import type { NotificationsService } from '../notifications/notifications.service';
 import { TasksService } from './tasks.service';
+
+jest.mock('../realtime/realtime.service', () => ({
+  RealtimeService: class RealtimeService {},
+}));
 
 const task = {
   id: 't1',
@@ -16,6 +21,7 @@ const task = {
   reporterId: 'u1',
   priority: 1,
   status: 'todo',
+  position: 0,
   dueDate: null,
   estimatedTime: null,
   actualTime: null,
@@ -39,10 +45,14 @@ describe('TasksService', () => {
   let database: {
     $transaction: jest.Mock;
     $queryRaw: jest.Mock;
+    $executeRaw: jest.Mock;
     task: {
       create: jest.Mock;
+      count: jest.Mock;
+      findFirst: jest.Mock;
       findMany: jest.Mock;
       findUnique: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
       update: jest.Mock;
       delete: jest.Mock;
     };
@@ -53,15 +63,23 @@ describe('TasksService', () => {
     assertColumnInProject: jest.Mock;
   };
   let activities: { record: jest.Mock };
+  let notifications: {
+    recordTaskAssignment: jest.Mock;
+    publishCreated: jest.Mock;
+  };
 
   beforeEach(() => {
     database = {
       $transaction: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([{ id: 't1' }]),
+      $executeRaw: jest.fn().mockResolvedValue(1),
       task: {
         create: jest.fn().mockResolvedValue(task),
+        count: jest.fn().mockResolvedValue(0),
+        findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
         findUnique: jest.fn().mockResolvedValue(task),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(task),
         update: jest.fn().mockResolvedValue(task),
         delete: jest.fn().mockResolvedValue(task),
       },
@@ -79,10 +97,15 @@ describe('TasksService', () => {
       assertColumnInProject: jest.fn(),
     };
     activities = { record: jest.fn().mockResolvedValue({ id: 'a1' }) };
+    notifications = {
+      recordTaskAssignment: jest.fn().mockResolvedValue([]),
+      publishCreated: jest.fn(),
+    };
     service = new TasksService(
       database as unknown as PrismaService,
       access as unknown as AccessService,
       activities as unknown as ActivitiesService,
+      notifications as unknown as NotificationsService,
     );
   });
 
@@ -149,14 +172,20 @@ describe('TasksService', () => {
   });
 
   it('emits distinct semantic and generic update events', async () => {
-    database.task.update.mockResolvedValue({
+    const movedTask = {
       ...task,
       title: 'Shipped',
       columnId: 'c2',
+      position: 0,
       column: { id: 'c2', name: 'Done', position: 5 },
       priority: 2,
       description: 'Complete',
-    });
+    };
+    database.task.findMany
+      .mockResolvedValueOnce([{ id: 't1', position: 0, projectId: 'p1' }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ position: 0 }]);
+    database.task.update.mockResolvedValue(movedTask);
     await service.update('u1', 't1', {
       title: 'Shipped',
       columnId: 'c2',
@@ -198,6 +227,51 @@ describe('TasksService', () => {
     expect(database.task.delete).toHaveBeenCalledWith({ where: { id: 't1' } });
     expect(activities.record.mock.invocationCallOrder[0]).toBeLessThan(
       database.task.delete.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('reorders inside a Column without emitting Activity', async () => {
+    const secondTask = { ...task, id: 't2', position: 1 };
+    database.task.findMany
+      .mockResolvedValueOnce([
+        { id: 't1', position: 0, projectId: 'p1' },
+        { id: 't2', position: 1, projectId: 'p1' },
+      ])
+      .mockResolvedValueOnce([{ position: 0 }, { position: 1 }]);
+    database.task.findUniqueOrThrow
+      .mockResolvedValueOnce(task)
+      .mockResolvedValueOnce({ ...task, position: 1 });
+    database.task.update.mockResolvedValue(secondTask);
+
+    const result = await service.move('u1', 't1', {
+      columnId: 'c1',
+      targetIndex: 1,
+    });
+
+    expect(result.position).toBe(1);
+    expect(database.$executeRaw).toHaveBeenCalled();
+    expect(activities.record).not.toHaveBeenCalled();
+  });
+
+  it('records one TASK_MOVED event for a cross-Column move', async () => {
+    const movedTask = {
+      ...task,
+      columnId: 'c2',
+      column: { id: 'c2', name: 'Done', position: 5 },
+    };
+    database.task.findMany
+      .mockResolvedValueOnce([{ id: 't1', position: 0, projectId: 'p1' }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ position: 0 }]);
+    database.task.findUniqueOrThrow
+      .mockResolvedValueOnce(task)
+      .mockResolvedValueOnce(movedTask);
+
+    await service.move('u1', 't1', { columnId: 'c2', targetIndex: 0 });
+
+    expect(activities.record).toHaveBeenCalledWith(
+      database,
+      expect.objectContaining({ type: ActivityEvent.TASK_MOVED }),
     );
   });
 });

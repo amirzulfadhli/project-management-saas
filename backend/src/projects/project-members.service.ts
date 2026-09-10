@@ -12,6 +12,11 @@ import {
 import { Prisma, ProjectRole } from '../../generated/prisma/client';
 import { ActivitiesService } from '../activities/activities.service';
 import { ActivityEvent } from '../activities/activity.types';
+import { NotificationsService } from '../notifications/notifications.service';
+import {
+  NotificationType,
+  type NotificationDelivery,
+} from '../notifications/notification.types';
 
 const projectMemberSelect = {
   id: true,
@@ -29,6 +34,7 @@ export class ProjectMembersService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly activities: ActivitiesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async findAll(userId: string, projectId: string) {
@@ -42,12 +48,13 @@ export class ProjectMembersService {
   }
 
   async add(userId: string, projectId: string, dto: AddProjectMemberDto) {
-    return this.withLockedProject(projectId, async (tx) => {
+    let notificationDeliveries: NotificationDelivery[] = [];
+    const member = await this.withLockedProject(projectId, async (tx) => {
       await this.access.assertProjectMembershipAdmin(userId, projectId, tx);
 
       const project = await tx.project.findUnique({
         where: { id: projectId },
-        select: { organizationId: true },
+        select: { organizationId: true, name: true },
       });
       if (!project) {
         throw new NotFoundException('Project not found');
@@ -80,6 +87,16 @@ export class ProjectMembersService {
             role: member.role,
           },
         });
+        notificationDeliveries =
+          await this.notifications.recordMembershipChange(tx, {
+            actorId: userId,
+            targetUserId: member.userId,
+            projectId,
+            projectName: project.name,
+            memberId: member.id,
+            role: member.role,
+            type: NotificationType.PROJECT_MEMBER_ADDED_YOU,
+          });
         return member;
       } catch (error: unknown) {
         if (this.isUniqueConstraintViolation(error)) {
@@ -88,6 +105,8 @@ export class ProjectMembersService {
         throw error;
       }
     });
+    await this.notifications.publishCreated(notificationDeliveries);
+    return member;
   }
 
   async updateRole(
@@ -96,7 +115,8 @@ export class ProjectMembersService {
     memberId: string,
     dto: UpdateProjectMemberRoleDto,
   ) {
-    return this.withLockedProject(projectId, async (tx) => {
+    let notificationDeliveries: NotificationDelivery[] = [];
+    const member = await this.withLockedProject(projectId, async (tx) => {
       await this.access.assertProjectMembershipAdmin(userId, projectId, tx);
       const member = await this.findMember(tx, projectId, memberId);
 
@@ -129,8 +149,26 @@ export class ProjectMembersService {
           after: updated.role,
         },
       });
+      const project = await tx.project.findUniqueOrThrow({
+        where: { id: projectId },
+        select: { name: true },
+      });
+      notificationDeliveries = await this.notifications.recordMembershipChange(
+        tx,
+        {
+          actorId: userId,
+          targetUserId: updated.userId,
+          projectId,
+          projectName: project.name,
+          memberId: updated.id,
+          role: updated.role,
+          type: NotificationType.PROJECT_MEMBER_ROLE_CHANGED_YOU,
+        },
+      );
       return updated;
     });
+    await this.notifications.publishCreated(notificationDeliveries);
+    return member;
   }
 
   async remove(userId: string, projectId: string, memberId: string) {

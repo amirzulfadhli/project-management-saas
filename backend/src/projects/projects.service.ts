@@ -18,7 +18,6 @@ export const DEFAULT_COLUMNS = [
 
 const accessibleProjectWhere = (userId: string) => ({
   OR: [
-    { organization: { ownerId: userId } },
     { organization: { members: { some: { userId } } } },
     { projectMembers: { some: { userId } } },
   ],

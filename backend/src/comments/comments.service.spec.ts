@@ -9,6 +9,11 @@ import type { ActivitiesService } from '../activities/activities.service';
 import { ActivityEvent } from '../activities/activity.types';
 import type { PrismaService } from '../prisma/prisma.service';
 import { CommentsService } from './comments.service';
+import type { NotificationsService } from '../notifications/notifications.service';
+
+jest.mock('../realtime/realtime.service', () => ({
+  RealtimeService: class RealtimeService {},
+}));
 
 const comment = {
   id: 'c1',
@@ -39,13 +44,25 @@ describe('CommentsService', () => {
     assertProjectMembershipAdmin: jest.Mock;
   };
   let activities: { record: jest.Mock };
+  let notifications: {
+    recordCommentCreated: jest.Mock;
+    publishCreated: jest.Mock;
+  };
   let service: CommentsService;
 
   beforeEach(() => {
     database = {
       $transaction: jest.fn(),
       $queryRaw: jest.fn().mockResolvedValue([{ id: comment.id }]),
-      task: { findUnique: jest.fn().mockResolvedValue({ projectId: 'p1' }) },
+      task: {
+        findUnique: jest.fn().mockResolvedValue({
+          projectId: 'p1',
+          title: 'Task',
+          reporterId: 'u1',
+          assigneeId: null,
+          project: { name: 'Project' },
+        }),
+      },
       comment: {
         findUnique: jest.fn(),
         findFirst: jest.fn().mockResolvedValue(comment),
@@ -63,10 +80,15 @@ describe('CommentsService', () => {
       assertProjectMembershipAdmin: jest.fn(),
     };
     activities = { record: jest.fn().mockResolvedValue({ id: 'a1' }) };
+    notifications = {
+      recordCommentCreated: jest.fn().mockResolvedValue([]),
+      publishCreated: jest.fn(),
+    };
     service = new CommentsService(
       database as unknown as PrismaService,
       access as unknown as AccessService,
       activities as unknown as ActivitiesService,
+      notifications as unknown as NotificationsService,
     );
   });
 

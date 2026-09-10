@@ -20,24 +20,40 @@ import {
   CreateTaskDto,
   listTasksQuerySchema,
   ListTasksQueryDto,
+  moveTaskSchema,
+  MoveTaskDto,
   taskIdSchema,
   updateTaskSchema,
   UpdateTaskDto,
 } from './dto/task.dto';
 import type { AuthenticatedUser } from '../auth/auth.guard';
+import { RealtimeService } from '../realtime/realtime.service';
+import { RealtimeEventType } from '../realtime/realtime.types';
 
 @UseGuards(AuthGuard)
 @Controller('api/tasks')
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(
+    private readonly tasksService: TasksService,
+    private readonly realtime: RealtimeService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(
+  async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body(new ZodValidationPipe(createTaskSchema)) dto: CreateTaskDto,
   ) {
-    return this.tasksService.create(user.id, dto);
+    const task = await this.tasksService.create(user.id, dto);
+    await this.realtime.publish({
+      projectId: task.projectId,
+      type: RealtimeEventType.TASK_CREATED,
+      entity: 'task',
+      entityId: task.id,
+      taskId: task.id,
+      actorId: user.id,
+    });
+    return task;
   }
 
   @Get()
@@ -58,12 +74,39 @@ export class TasksController {
   }
 
   @Patch(':id')
-  update(
+  async update(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ZodValidationPipe(taskIdSchema)) id: string,
     @Body(new ZodValidationPipe(updateTaskSchema)) dto: UpdateTaskDto,
   ) {
-    return this.tasksService.update(user.id, id, dto);
+    const task = await this.tasksService.update(user.id, id, dto);
+    await this.realtime.publish({
+      projectId: task.projectId,
+      type: RealtimeEventType.TASK_UPDATED,
+      entity: 'task',
+      entityId: task.id,
+      taskId: task.id,
+      actorId: user.id,
+    });
+    return task;
+  }
+
+  @Patch(':id/move')
+  async move(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(taskIdSchema)) id: string,
+    @Body(new ZodValidationPipe(moveTaskSchema)) dto: MoveTaskDto,
+  ) {
+    const task = await this.tasksService.move(user.id, id, dto);
+    await this.realtime.publish({
+      projectId: task.projectId,
+      type: RealtimeEventType.TASK_MOVED,
+      entity: 'task',
+      entityId: task.id,
+      taskId: task.id,
+      actorId: user.id,
+    });
+    return task;
   }
 
   @Delete(':id')
@@ -72,6 +115,14 @@ export class TasksController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ZodValidationPipe(taskIdSchema)) id: string,
   ) {
-    await this.tasksService.remove(user.id, id);
+    const deleted = await this.tasksService.remove(user.id, id);
+    await this.realtime.publish({
+      projectId: deleted.projectId,
+      type: RealtimeEventType.TASK_DELETED,
+      entity: 'task',
+      entityId: id,
+      taskId: id,
+      actorId: user.id,
+    });
   }
 }

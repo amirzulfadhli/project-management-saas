@@ -6,9 +6,10 @@ import { ProjectMembersService } from './project-members.service';
 import { ProjectColumnsController } from './project-columns.controller';
 import { ProjectColumnsService } from './project-columns.service';
 import { ActivitiesModule } from '../activities/activities.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [ActivitiesModule],
+  imports: [ActivitiesModule, NotificationsModule],
   controllers: [
     ProjectsController,
     ProjectMembersController,

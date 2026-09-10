@@ -28,6 +28,8 @@ only application-level event constants:
   `TASK_STATUS_CHANGED`, `TASK_ASSIGNEE_CHANGED`,
   `TASK_PRIORITY_CHANGED`, `TASK_DELETED`
 - Comment: `COMMENT_CREATED`, `COMMENT_UPDATED`, `COMMENT_DELETED`
+- Attachment: `ATTACHMENT_UPLOADED`, `ATTACHMENT_DELETED`
+- Wiki: `WIKI_PAGE_CREATED`, `WIKI_PAGE_UPDATED`, `WIKI_PAGE_DELETED`
 
 Metadata stores small before/after values and identity snapshots needed to
 render an event without parsing its description. It avoids credentials, session
@@ -35,6 +37,13 @@ data, and large Task descriptions.
 
 Comment events store only `commentId`, optional `parentId`, and content lengths.
 They never copy Comment bodies into the Project Activity feed.
+
+Attachment events store compact identity, scope, display filename, MIME type,
+and byte length. File contents, storage keys, and server paths are never copied
+into Activity.
+
+Wiki events store only page identity/title, parent identity where useful, and
+changed-field names. They never copy Markdown bodies into Activity.
 
 ## Transaction guarantee
 
@@ -96,8 +105,8 @@ boundary.
 - Direct database writes can bypass Task/Project consistency; supported writers
   always derive Project scope from the domain mutation.
 - Actor deletion remains restricted until account anonymization is designed.
-- Column events, realtime delivery, notifications, event buses, and outbox
-  processing are intentionally absent.
+- Realtime delivery is best-effort cache invalidation; event buses and an
+  outbox remain intentionally absent.
 - Comment create/edit/delete use the internal recorder in the same transaction.
 - Activity filtering, search, realtime delivery, and notifications remain
   future work.

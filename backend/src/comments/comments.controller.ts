@@ -26,11 +26,16 @@ import {
   updateCommentSchema,
   UpdateCommentDto,
 } from './dto/comment.dto';
+import { RealtimeService } from '../realtime/realtime.service';
+import { RealtimeEventType } from '../realtime/realtime.types';
 
 @UseGuards(AuthGuard)
 @Controller('api/tasks/:taskId/comments')
 export class CommentsController {
-  constructor(private readonly commentsService: CommentsService) {}
+  constructor(
+    private readonly commentsService: CommentsService,
+    private readonly realtime: RealtimeService,
+  ) {}
 
   @Get()
   findAll(
@@ -45,17 +50,25 @@ export class CommentsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(
+  async create(
     @CurrentUser() user: AuthenticatedUser,
     @Param('taskId', new ZodValidationPipe(commentTaskIdSchema))
     taskId: string,
     @Body(new ZodValidationPipe(createCommentSchema)) dto: CreateCommentDto,
   ) {
-    return this.commentsService.create(user.id, taskId, dto);
+    const comment = await this.commentsService.create(user.id, taskId, dto);
+    await this.realtime.publishForTask({
+      type: RealtimeEventType.COMMENT_CREATED,
+      entity: 'comment',
+      entityId: comment.id,
+      taskId,
+      actorId: user.id,
+    });
+    return comment;
   }
 
   @Patch(':commentId')
-  update(
+  async update(
     @CurrentUser() user: AuthenticatedUser,
     @Param('taskId', new ZodValidationPipe(commentTaskIdSchema))
     taskId: string,
@@ -63,7 +76,20 @@ export class CommentsController {
     commentId: string,
     @Body(new ZodValidationPipe(updateCommentSchema)) dto: UpdateCommentDto,
   ) {
-    return this.commentsService.update(user.id, taskId, commentId, dto);
+    const comment = await this.commentsService.update(
+      user.id,
+      taskId,
+      commentId,
+      dto,
+    );
+    await this.realtime.publishForTask({
+      type: RealtimeEventType.COMMENT_UPDATED,
+      entity: 'comment',
+      entityId: commentId,
+      taskId,
+      actorId: user.id,
+    });
+    return comment;
   }
 
   @Delete(':commentId')
@@ -76,5 +102,12 @@ export class CommentsController {
     commentId: string,
   ) {
     await this.commentsService.remove(user.id, taskId, commentId);
+    await this.realtime.publishForTask({
+      type: RealtimeEventType.COMMENT_DELETED,
+      entity: 'comment',
+      entityId: commentId,
+      taskId,
+      actorId: user.id,
+    });
   }
 }

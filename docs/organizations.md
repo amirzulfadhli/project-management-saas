@@ -1,100 +1,121 @@
-# FlowPlan organization backend
+# FlowPlan Organizations
 
-## Organization and membership
+Status: Organization onboarding and membership administration are implemented
+and PostgreSQL-verified. The administration UI is statically verified; manual
+browser acceptance remains part of the consolidated QA backlog.
 
-An `Organization` is the workspace that owns shared resources. It has one
-explicit owner through `ownerId`, plus a collection of
-`OrganizationMember` rows.
+## Role and authorization model
 
-`OrganizationMember` is the membership (or join) model between users and
-organizations. One user can belong to many organizations, and one organization
-can contain many users, so the relationship is many-to-many:
+OrganizationMember is the authoritative membership record. Its existing
+OrganizationRole remains intentionally small:
 
-```text
-User 1 --- * OrganizationMember * --- 1 Organization
-```
+- OWNER can list, add, promote, demote, and remove Organization members.
+- MEMBER can use the Organization and its Projects but cannot administer
+  Organization membership.
 
-The join row is useful because the relationship has its own data: the
-`OrganizationRole` value is either `OWNER` or `MEMBER`.
+Both roles inherit access to every Project owned by the Organization. Explicit
+ProjectMember rows are a separate access path and retain their independent
+ProjectRole (OWNER or MEMBER). Organization roles never silently become
+Project roles.
 
-## Ownership versus membership
+Organization.ownerId is retained as the required primary-owner relation for
+schema compatibility. Authorization is based on the matching
+OrganizationMember.role, not merely on ownerId. When the primary owner is
+demoted or removed, the service atomically points ownerId at another existing
+Organization OWNER.
 
-Ownership and membership answer related but different questions:
+## API
 
-- `Organization.ownerId` identifies the single user responsible for the
-  organization.
-- An `OrganizationMember` row says that a user may access the organization.
-- The creator receives both: their ID becomes `ownerId`, and a membership row
-  is created with role `OWNER`.
+All routes require a Better Auth session. Route IDs are strict UUIDs and
+request bodies are strict Zod objects.
 
-FlowPlan creates the organization and OWNER membership in one nested Prisma
-`create`. Nested writes are transactional, so the database will not keep an
-organization if its creator membership cannot be created.
+- POST /api/organizations creates an Organization and its initial OWNER
+  membership together.
+- GET /api/organizations lists the current user's memberships.
+- GET /api/organizations/:organizationId returns one accessible Organization.
+- GET /api/organizations/:organizationId/members lists the compact roster for
+  any current Organization member.
+- POST /api/organizations/:organizationId/members accepts an email field from
+  an OWNER and adds that existing FlowPlan user as MEMBER.
+- PATCH /api/organizations/:organizationId/members/:memberId accepts only an
+  OWNER or MEMBER role field from an OWNER.
+- DELETE /api/organizations/:organizationId/members/:memberId removes the
+  member when initiated by an OWNER.
 
-## Database constraints and relations
+The roster response contains only membership ID, Organization ID, user ID,
+role, and the user's name/email/image summary. It never exposes accounts,
+sessions, passwords, provider tokens, or auth internals. OrganizationMember
+currently has no joined timestamp, so the API does not invent one.
 
-- `Organization.slug @unique` makes a public-style slug globally unique.
-- `@@unique([organizationId, userId])` prevents duplicate memberships.
-- `OrganizationRole` is a PostgreSQL/Prisma enum, preventing arbitrary role
-  strings.
-- `ownerId`, `organizationId`, and `userId` are foreign keys. They prevent
-  references to users or organizations that do not exist.
-- Indexes on `Organization.ownerId` and `OrganizationMember.userId` support
-  the list and access queries used by onboarding.
+## Existing-user addition
 
-Prisma exposes these relationships as `Organization.owner`,
-`Organization.members`, `User.ownedOrganizations`, and
-`User.organizationMembers`.
+FlowPlan does not yet have invitation tokens or email delivery. The add form is
+therefore explicit: it accepts the normalized email of an account that already
+exists and always adds it initially as MEMBER. An owner can promote the new
+member separately.
 
-## Authentication and authorization
+Authorization runs before account lookup, so unauthorized callers cannot use
+the endpoint to probe account existence. A missing account returns 404 to an
+authorized owner, duplicate membership returns 409, and malformed or unknown
+fields return 400.
 
-Authentication answers “which user made this request?” Every organization route
-uses `AuthGuard`, which resolves the Better Auth session and places the user on
-the Nest request. `@CurrentUser()` passes that session-derived user to the
-controller; the client cannot choose a different user ID.
+## Transactions and owner invariant
 
-Authorization answers “may that authenticated user access this organization?”
-`AccessService.assertOrganizationMember` permits the explicit owner or a user
-with a matching membership row. An authenticated non-member receives HTTP 403.
-A request without a valid session is rejected earlier with HTTP 401.
+Every add, role-change, and removal mutation locks the Organization row with
+PostgreSQL SELECT FOR UPDATE. Authorization and target lookup are then repeated
+through the active transaction client.
 
-## DTO validation
+A demotion or removal of an OWNER must find another owner while holding that
+lock. Otherwise it returns HTTP 409. This protects against concurrent
+demotion/removal requests leaving the Organization ownerless. Same-role PATCH
+is idempotent and performs no update.
 
-`CreateOrganizationDto` is inferred from a strict Zod schema:
+An owner may remove themselves only when another owner remains. Ordinary
+members cannot remove themselves through the administration API; an owner must
+remove them.
 
-- `name` is trimmed, required, and limited to 120 characters.
-- An explicit `slug` is limited to 80 characters.
-- Slugs contain lowercase letters or numbers separated by single hyphens.
-- Unknown fields are rejected rather than silently stored.
+## Inherited and explicit Project access
 
-When no slug is supplied, the service derives one from the organization name
-and adds a numeric suffix if needed. PostgreSQL's unique constraint remains the
-final authority; a concurrent duplicate is translated to HTTP 409.
+Removing an Organization membership removes only the inherited access path:
 
-## Request flow
+- Organization access only: Project access ends immediately.
+- Organization membership plus explicit ProjectMember: explicit Project access
+  remains.
+- Removing Organization membership does not delete explicit Project
+  memberships, Tasks, assignments, Comments, Activity, or other Project data.
 
-```text
-Authenticated request
-  -> OrganizationsController
-  -> AuthGuard / CurrentUser
-  -> ZodValidationPipe (for create)
-  -> OrganizationsService
-  -> AccessService (for selected organization)
-  -> Prisma
-  -> PostgreSQL Organization + OrganizationMember
-```
+AccessService remains the policy boundary for REST and realtime access.
+Organization removal gathers the Organization's Project IDs inside the
+transaction and reauthorizes their connected rooms only after commit. Sockets
+with no remaining access are evicted; sockets with explicit Project access
+remain authorized.
 
-The implemented routes are:
+## Activity and Notifications
 
-- `POST /api/organizations` — create an organization and OWNER membership.
-- `GET /api/organizations` — list organizations owned by or joined by the
-  current user.
-- `GET /api/organizations/:id` — retrieve one organization after membership
-  authorization.
+Activity and Notification rows currently require projectId. Organization
+administration is Organization-scoped, so this milestone deliberately does not
+write misleading records against an arbitrary Project. Honest Organization
+Activity or Notifications require a future scope-model decision.
+
+## Frontend administration
+
+The Organizations page opens a scoped members dialog. Any member can inspect
+the roster. Owners additionally receive add, role, and confirmed remove
+controls. Demotion explains the loss of administration rights; removal
+explains inherited versus explicit Project access.
+
+The TanStack Query key includes the exact organizationId. Mutations update or
+invalidate only that Organization's roster, detail, list entry, and Project
+list. Backend authorization remains authoritative.
 
 ## Verification
 
-`backend/test/organizations.e2e-spec.ts` verifies creation, OWNER membership,
-user-scoped listing, selected-organization retrieval, non-member rejection,
-unauthenticated rejection, duplicate slugs, and invalid slugs against
-PostgreSQL.
+The focused Organization administration E2E suite covers listing, existing-user
+addition, strict validation, owner/member/outsider isolation, promotion,
+idempotency, safe demotion, final-owner conflicts, owner self-removal, primary
+owner reassignment, concurrent owner demotion, inherited access loss, explicit
+access preservation, and realtime eviction or retention.
+
+No schema migration was required. Before switching authority to membership
+roles, the development database was checked: all four Organizations had a
+matching OWNER membership for their ownerId.

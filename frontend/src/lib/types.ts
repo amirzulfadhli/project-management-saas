@@ -122,6 +122,7 @@ export interface Task {
   reporterId: string;
   priority: number;
   status: string;
+  position: number;
   dueDate: string | null;
   estimatedTime: number | null;
   actualTime: number | null;
@@ -144,6 +145,14 @@ export interface Task {
 export interface CreateOrganizationInput {
   name: string;
   slug?: string;
+}
+
+export interface AddOrganizationMemberInput {
+  email: string;
+}
+
+export interface UpdateOrganizationMemberRoleInput {
+  role: "OWNER" | "MEMBER";
 }
 
 export interface CreateProjectInput {
@@ -201,6 +210,11 @@ export interface UpdateTaskInput {
   completedAt?: string | null;
 }
 
+export interface MoveTaskInput {
+  columnId: string;
+  targetIndex: number;
+}
+
 export interface TaskFilters {
   columnId?: string;
   assigneeId?: string;
@@ -230,6 +244,60 @@ export interface ActivityPage {
   nextCursor: string | null;
 }
 
+export interface GithubInstallUrlResponse {
+  url: string;
+  expiresAt: string;
+}
+
+export interface GithubInstallation {
+  id: string;
+  externalInstallationId: string;
+  accountLogin: string;
+  accountId: string;
+  accountType: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GithubRepository {
+  externalRepositoryId: string;
+  owner: string;
+  name: string;
+  fullName: string;
+  defaultBranch: string;
+  htmlUrl: string;
+  private: boolean;
+  archived: boolean;
+}
+
+export interface GithubRepositoryPage {
+  items: GithubRepository[];
+  page: number;
+  perPage: number;
+  totalCount: number;
+  nextPage: number | null;
+}
+
+export interface ProjectRepository {
+  id: string;
+  projectId: string | null;
+  provider: string;
+  externalRepositoryId: string | null;
+  owner: string | null;
+  name: string;
+  fullName: string;
+  htmlUrl: string;
+  defaultBranch: string | null;
+  installationId: string | null;
+  connectedAt: string;
+  updatedAt: string;
+}
+
+export interface ConnectGithubRepositoryInput {
+  installationId: string;
+  externalRepositoryId: string;
+}
+
 export interface CommentItem {
   id: string;
   taskId: string;
@@ -253,4 +321,128 @@ export interface CreateCommentInput {
 
 export interface UpdateCommentInput {
   content: string;
+}
+
+export type NotificationType =
+  | "TASK_ASSIGNED_TO_YOU"
+  | "TASK_UNASSIGNED_FROM_YOU"
+  | "COMMENT_REPLY_TO_YOU"
+  | "COMMENT_ON_YOUR_TASK"
+  | "PROJECT_MEMBER_ADDED_YOU"
+  | "PROJECT_MEMBER_ROLE_CHANGED_YOU";
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  projectId: string;
+  entityType: "task" | "comment" | "project-member";
+  entityId: string | null;
+  metadata: Record<string, unknown> | null;
+  readAt: string | null;
+  createdAt: string;
+  actor: UserSummary;
+  project: { id: string; name: string };
+}
+
+export interface NotificationPage {
+  items: NotificationItem[];
+  nextCursor: string | null;
+}
+
+export interface NotificationUnreadCount {
+  count: number;
+}
+
+export interface AttachmentItem {
+  id: string;
+  projectId: string;
+  taskId: string | null;
+  uploaderId: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+  uploader: UserSummary;
+}
+
+export interface AttachmentPage {
+  items: AttachmentItem[];
+  nextCursor: string | null;
+}
+
+export interface WikiPageSummary {
+  id: string;
+  projectId: string;
+  parentId: string | null;
+  title: string;
+  position: number;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  creator: UserSummary;
+}
+
+export interface WikiPage extends WikiPageSummary {
+  content: string;
+}
+
+export interface CreateWikiPageInput {
+  title: string;
+  content?: string;
+  parentId?: string | null;
+}
+
+export interface UpdateWikiPageInput {
+  title?: string;
+  content?: string;
+}
+
+export interface MoveWikiPageInput {
+  parentId: string | null;
+  targetIndex: number;
+}
+
+export interface TimeEntry {
+  id: string;
+  projectId: string;
+  taskId: string;
+  userId: string;
+  startedAt: string;
+  endedAt: string | null;
+  durationSeconds: number | null;
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+  task: { id: string; title: string; projectId: string };
+}
+
+export interface TaskTimePage {
+  taskId: string;
+  totalSeconds: number;
+  items: TimeEntry[];
+  nextCursor: string | null;
+}
+
+export interface ActiveTimerResponse {
+  activeTimer: TimeEntry | null;
+}
+
+export interface ProjectTimeSummary {
+  projectId: string;
+  totalSeconds: number;
+  currentUserSeconds: number;
+  tasks: Array<{ taskId: string; title: string; totalSeconds: number }>;
+  users: Array<{
+    userId: string;
+    name: string;
+    email: string;
+    image: string | null;
+    totalSeconds: number;
+  }> | null;
+}
+
+export interface CreateManualTimeEntryInput {
+  startedAt: string;
+  endedAt: string;
+  note?: string | null;
 }

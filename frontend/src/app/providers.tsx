@@ -6,6 +6,7 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
+import { RealtimeProvider } from "@/lib/realtime";
 
 let browserQueryClient: QueryClient | undefined;
 
@@ -26,6 +27,8 @@ function getQueryClient(): QueryClient {
 export function Providers({ children }: { children: ReactNode }) {
   const queryClient = getQueryClient();
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <RealtimeProvider>{children}</RealtimeProvider>
+    </QueryClientProvider>
   );
 }

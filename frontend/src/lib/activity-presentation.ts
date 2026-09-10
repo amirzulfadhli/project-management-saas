@@ -1,6 +1,7 @@
 import type { ActivityItem } from "./types";
 
-export type ActivityCategory = "project" | "task" | "member" | "comment";
+export type ActivityCategory =
+  "project" | "task" | "member" | "comment" | "integration";
 
 interface ActivityDefinition {
   fallback: string;
@@ -47,6 +48,34 @@ const activityDefinitions: Record<string, ActivityDefinition> = {
   COMMENT_CREATED: { fallback: "added a Comment", category: "comment" },
   COMMENT_UPDATED: { fallback: "updated a Comment", category: "comment" },
   COMMENT_DELETED: { fallback: "deleted a Comment", category: "comment" },
+  GITHUB_REPOSITORY_CONNECTED: {
+    fallback: "connected a GitHub repository",
+    category: "integration",
+  },
+  GITHUB_REPOSITORY_DISCONNECTED: {
+    fallback: "disconnected a GitHub repository",
+    category: "integration",
+  },
+  ATTACHMENT_UPLOADED: {
+    fallback: "uploaded an attachment",
+    category: "integration",
+  },
+  ATTACHMENT_DELETED: {
+    fallback: "deleted an attachment",
+    category: "integration",
+  },
+  WIKI_PAGE_CREATED: {
+    fallback: "created a documentation page",
+    category: "project",
+  },
+  WIKI_PAGE_UPDATED: {
+    fallback: "updated a documentation page",
+    category: "project",
+  },
+  WIKI_PAGE_DELETED: {
+    fallback: "deleted a documentation page",
+    category: "project",
+  },
 };
 
 export function presentActivity(activity: ActivityItem): {

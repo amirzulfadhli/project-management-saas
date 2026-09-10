@@ -117,9 +117,16 @@ Board selector because FlowPlan still has exactly one Board per Project.
 
 ## Task ordering
 
-Tasks still have no position/rank field inside a Column. Column management does
-not add Task ordering, drag-and-drop, fractional ranking, or implicit Task
-movement. Those require a separate data-model and workflow milestone.
+Tasks have a separate required `position` scoped by `columnId`; this does not
+change Column ordering. Task create appends, the dedicated Task move endpoint
+supports same-Column reorder and cross-Column insertion, and Task deletion
+normalizes the remaining dense positions transactionally.
+
+The Project board uses maintained dnd-kit primitives for pointer, touch, and
+keyboard-capable movement. It updates only the current Project Task cache
+optimistically, restores the prior order on failure, and refetches the backend
+order after completion. The existing Task dialog Column selector remains a
+non-drag fallback.
 
 Column reordering is also still unsupported by the backend and is not simulated
 in the frontend. Column order remains the deterministic order returned by the
@@ -127,14 +134,18 @@ server.
 
 ## Frontend verification
 
-On 2026-09-02, frontend TypeScript, ESLint, Prettier, and the Next.js production
-build passed. Static contract inspection confirmed that all four frontend API
-helpers target the verified Project-nested routes and send no client-owned
-relationship or position fields. The repository has no frontend automated test
-framework, and browser automation was unavailable in the Windows environment.
+On 2026-09-08, the board passed real Microsoft Edge acceptance for pointer,
+touch, and keyboard Task movement. The tested matrix includes beginning,
+middle, end, cross-Column, and empty-Column placement; keyboard cancellation;
+rapid sequential moves; and rollback after a stale destination failure. The
+mobile shell collapses to an icon navigation rail, leaving the board a
+dedicated horizontal scroller at 390 pixels without document-level overflow.
+Task drag handles expose a visible focus ring and a 40-by-40-pixel touch target.
 
-The focused backend Column e2e suite was also requested as a regression check,
-but its current run could not reach the configured PostgreSQL server
-(`ECONNREFUSED`) during test setup. No backend or schema files changed in this
-frontend milestone; the backend contract remains covered by the previously
-successful PostgreSQL verification.
+Frontend TypeScript, ESLint, changed-file Prettier, and the Next production
+build remain the automated frontend gates because the repository has no
+dedicated browser test framework.
+
+The focused Task PostgreSQL suite passes 10/10 and the complete backend E2E
+suite remains green after the ordering migration. All ten migrations also
+deploy from zero and Prisma reports no schema drift.

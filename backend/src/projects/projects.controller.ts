@@ -24,11 +24,16 @@ import {
   UpdateProjectDto,
 } from './dto/project.dto';
 import type { AuthenticatedUser } from '../auth/auth.guard';
+import { RealtimeService } from '../realtime/realtime.service';
+import { RealtimeEventType } from '../realtime/realtime.types';
 
 @UseGuards(AuthGuard)
 @Controller('api/projects')
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly realtime: RealtimeService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -64,12 +69,20 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  update(
+  async update(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateProjectSchema)) dto: UpdateProjectDto,
   ) {
-    return this.projectsService.update(user.id, id, dto);
+    const project = await this.projectsService.update(user.id, id, dto);
+    await this.realtime.publish({
+      projectId: id,
+      type: RealtimeEventType.PROJECT_UPDATED,
+      entity: 'project',
+      entityId: id,
+      actorId: user.id,
+    });
+    return project;
   }
 
   @Delete(':id')
@@ -79,5 +92,12 @@ export class ProjectsController {
     @Param('id') id: string,
   ) {
     await this.projectsService.archive(user.id, id);
+    await this.realtime.publish({
+      projectId: id,
+      type: RealtimeEventType.PROJECT_ARCHIVED,
+      entity: 'project',
+      entityId: id,
+      actorId: user.id,
+    });
   }
 }

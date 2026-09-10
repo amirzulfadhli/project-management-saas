@@ -20,7 +20,6 @@ interface ProjectMembersModalProps {
   onClose: () => void;
   projectId: string;
   organizationId: string;
-  organizationOwnerId: string;
 }
 
 interface RoleMutationInput {
@@ -45,7 +44,6 @@ export function ProjectMembersModal({
   onClose,
   projectId,
   organizationId,
-  organizationOwnerId,
 }: ProjectMembersModalProps) {
   const queryClient = useQueryClient();
   const { selectedOrganization } = useOrganization();
@@ -64,8 +62,13 @@ export function ProjectMembersModal({
 
   const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
   const currentUserId = session?.user.id ?? null;
+  const isOrganizationOwner =
+    selectedOrganization?.id === organizationId &&
+    selectedOrganization.members?.some(
+      (member) => member.userId === currentUserId && member.role === "OWNER",
+    );
   const canAdminister =
-    currentUserId === organizationOwnerId ||
+    Boolean(isOrganizationOwner) ||
     members.some(
       (member) => member.userId === currentUserId && member.role === "OWNER",
     );

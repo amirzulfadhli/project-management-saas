@@ -14,7 +14,7 @@ inherits access to Projects in that Organization, while an explicit
 
 The administration policy is:
 
-- the Organization owner or a `ProjectMember` with role `OWNER` may add,
+- an Organization `OWNER` or a `ProjectMember` with role `OWNER` may add,
   promote, demote, or remove Project members;
 - a Project member may remove their own explicit membership even if they are
   not an administrator, subject to the last-owner rule;
@@ -26,9 +26,10 @@ The administration policy is:
 - removing an explicit membership does not revoke access inherited from the
   Organization.
 
-`Organization.ownerId` is the authoritative Organization-owner check. Merely
-having `OrganizationRole.OWNER` on a membership row does not create a second
-Organization owner under the current schema.
+`OrganizationMember.role = OWNER` is the authoritative Organization-owner
+check, and multiple Organization owners are supported. `Organization.ownerId`
+remains a required primary-owner relation for schema compatibility and is
+reassigned to another owner if its current user is demoted or removed.
 
 ## Implemented HTTP contract
 
@@ -49,7 +50,7 @@ roster beneath the owning Project resource.
     { "userId": "better-auth-user-id", "role": "MEMBER" }
 
 - Authentication: required.
-- Authorization: Organization owner or Project `OWNER`.
+- Authorization: Organization `OWNER` or Project `OWNER`.
 - `role` is optional and defaults to `MEMBER`; valid values are `OWNER` and
   `MEMBER`.
 - The target User must already belong to the owning Organization.
@@ -61,7 +62,7 @@ roster beneath the owning Project resource.
     { "role": "OWNER" }
 
 - Authentication: required.
-- Authorization: Organization owner or Project `OWNER`.
+- Authorization: Organization `OWNER` or Project `OWNER`.
 - Updating to the existing role is an idempotent HTTP 200 response.
 - Demoting an `OWNER` is rejected if that member is the last Project owner.
 - Response: HTTP 200 with the updated `ProjectMemberResponse`.
@@ -71,7 +72,7 @@ roster beneath the owning Project resource.
     DELETE /api/projects/:projectId/members/:memberId
 
 - Authentication: required.
-- Authorization: Organization owner, Project `OWNER`, or the member removing
+- Authorization: Organization `OWNER`, Project `OWNER`, or the member removing
   their own explicit membership.
 - Removing the last Project `OWNER` is rejected, including self-removal.
 - Response: HTTP 204 with no body.
@@ -114,12 +115,12 @@ The Project detail header opens `ProjectMembersModal`. Its query key is
 `["project-members", { projectId }]`, so a roster cached for Project A cannot
 be rendered for Project B. The modal displays the server-ordered explicit
 roster, marks the signed-in User, and exposes role/removal controls when the
-current session is the Organization owner or an explicit Project `OWNER`.
+current session is an Organization `OWNER` or an explicit Project `OWNER`.
 Those client checks only reduce misleading controls; NestJS remains the
 authorization boundary and 403/404/409 responses are shown inline.
 
 Add-member choices come from the existing selected-Organization detail
-response, which includes the Organization owner and all `OrganizationMember`
+response, which includes the primary Organization owner and all `OrganizationMember`
 Users. Existing Project members are removed from the selector. FlowPlan does
 not accept arbitrary IDs, imply an invitation, or show external Users. If the
 Organization detail is unavailable for the active Project, the add form states
@@ -154,7 +155,7 @@ HTTP 409.
 
 `AccessService.assertProjectMembershipAdmin` permits only the Organization
 owner or an explicit Project `OWNER`. `assertProspectiveProjectMember` verifies
-that a target User is the Organization owner or has an `OrganizationMember`
+that a target User has an `OrganizationMember`
 row; it distinguishes a missing User (404) from an existing User outside the
 Organization (400).
 
@@ -195,7 +196,7 @@ An `OWNER` may demote or remove themselves only when another owner remains.
 ## Task-assignment decision
 
 The existing Task rule considers an assignee valid when they have Project
-access: Organization owner, Organization member, or explicit Project member.
+access: Organization `OWNER`, Organization `MEMBER`, or explicit Project member.
 Task points to `User`, not to `ProjectMember`.
 
 Therefore:

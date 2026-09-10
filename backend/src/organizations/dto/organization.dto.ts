@@ -14,3 +14,20 @@ export const createOrganizationSchema = z.strictObject({
 });
 
 export type CreateOrganizationDto = z.infer<typeof createOrganizationSchema>;
+
+export const organizationIdSchema = z.string().uuid();
+
+export const addOrganizationMemberSchema = z.strictObject({
+  email: z.string().trim().toLowerCase().email().max(320),
+});
+
+export const updateOrganizationMemberRoleSchema = z.strictObject({
+  role: z.enum(['OWNER', 'MEMBER']),
+});
+
+export type AddOrganizationMemberDto = z.infer<
+  typeof addOrganizationMemberSchema
+>;
+export type UpdateOrganizationMemberRoleDto = z.infer<
+  typeof updateOrganizationMemberRoleSchema
+>;

@@ -11,6 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { TaskComments } from "@/components/tasks/task-comments";
+import { AttachmentsPanel } from "@/components/attachments/attachments-panel";
+import { TaskTimePanel } from "@/components/time-tracking/task-time-panel";
 
 interface TaskModalProps {
   onClose: () => void;
@@ -61,9 +63,9 @@ export function TaskModal({
     task?.dueDate ? task.dueDate.slice(0, 10) : "",
   );
   const [error, setError] = useState<string | null>(null);
-  const [activePanel, setActivePanel] = useState<"details" | "comments">(
-    "details",
-  );
+  const [activePanel, setActivePanel] = useState<
+    "details" | "comments" | "attachments" | "time"
+  >("details");
 
   const listKey = queryKeys.tasks(projectId);
   const selectedColumn = projectColumns.find(
@@ -138,6 +140,13 @@ export function TaskModal({
         selectedColumn &&
         selectedColumn.id !== task.columnId
       ) {
+        const appendPosition = previousTasks.reduce(
+          (nextPosition, item) =>
+            item.columnId === selectedColumn.id
+              ? Math.max(nextPosition, item.position + 1)
+              : nextPosition,
+          0,
+        );
         queryClient.setQueryData<Task[]>(
           listKey,
           previousTasks.map((item) =>
@@ -145,6 +154,7 @@ export function TaskModal({
               ? {
                   ...item,
                   columnId: selectedColumn.id,
+                  position: appendPosition,
                   column: {
                     id: selectedColumn.id,
                     name: selectedColumn.name,
@@ -216,10 +226,20 @@ export function TaskModal({
           queryKey: queryKeys.taskComments(task.id),
           exact: true,
         });
+        queryClient.removeQueries({
+          queryKey: queryKeys.taskAttachments(task.id, currentUserId),
+          exact: true,
+        });
       }
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.projects(organizationId),
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.projects(organizationId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.projectAttachments(projectId, currentUserId),
+          exact: true,
+        }),
+      ]);
       onClose();
     },
     onError: (mutationError: unknown, _input, context) => {
@@ -286,24 +306,26 @@ export function TaskModal({
           role="tablist"
           aria-label="Task sections"
         >
-          {(["details", "comments"] as const).map((panel) => (
-            <button
-              key={panel}
-              id={`task-${panel}-tab`}
-              type="button"
-              role="tab"
-              aria-selected={activePanel === panel}
-              aria-controls={`task-${panel}-panel`}
-              onClick={() => setActivePanel(panel)}
-              className={`flex-1 rounded-sm px-3 py-2 text-sm font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                activePanel === panel
-                  ? "bg-surface text-text-primary shadow-sm"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {panel}
-            </button>
-          ))}
+          {(["details", "comments", "attachments", "time"] as const).map(
+            (panel) => (
+              <button
+                key={panel}
+                id={`task-${panel}-tab`}
+                type="button"
+                role="tab"
+                aria-selected={activePanel === panel}
+                aria-controls={`task-${panel}-panel`}
+                onClick={() => setActivePanel(panel)}
+                className={`flex-1 rounded-sm px-3 py-2 text-sm font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  activePanel === panel
+                    ? "bg-surface text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {panel}
+              </button>
+            ),
+          )}
         </div>
       ) : null}
 
@@ -483,7 +505,7 @@ export function TaskModal({
             </div>
           </div>
         </form>
-      ) : task ? (
+      ) : activePanel === "comments" && task ? (
         <div
           id="task-comments-panel"
           role="tabpanel"
@@ -494,6 +516,33 @@ export function TaskModal({
             projectId={projectId}
             currentUserId={currentUserId}
             canModerate={canModerateComments}
+          />
+        </div>
+      ) : activePanel === "attachments" && task ? (
+        <div
+          id="task-attachments-panel"
+          role="tabpanel"
+          aria-labelledby="task-attachments-tab"
+          className="max-h-[68vh] overflow-y-auto pr-1"
+        >
+          <AttachmentsPanel
+            scope="task"
+            resourceId={task.id}
+            projectId={projectId}
+            currentUserId={currentUserId}
+            canAdminister={canModerateComments}
+          />
+        </div>
+      ) : activePanel === "time" && task ? (
+        <div
+          id="task-time-panel"
+          role="tabpanel"
+          aria-labelledby="task-time-tab"
+        >
+          <TaskTimePanel
+            taskId={task.id}
+            projectId={projectId}
+            currentUserId={currentUserId}
           />
         </div>
       ) : null}

@@ -1,5 +1,6 @@
 import type {
   ActivityPage,
+  AddOrganizationMemberInput,
   Column,
   CommentItem,
   CommentPage,
@@ -9,9 +10,15 @@ import type {
   CreateProjectInput,
   CreateTaskInput,
   AddProjectMemberInput,
+  ConnectGithubRepositoryInput,
+  GithubInstallation,
+  GithubInstallUrlResponse,
+  GithubRepositoryPage,
   Organization,
+  OrganizationMember,
   ProjectDetail,
   ProjectMember,
+  ProjectRepository,
   ProjectSummary,
   Task,
   TaskFilters,
@@ -19,7 +26,22 @@ import type {
   UpdateProjectColumnInput,
   UpdateProjectInput,
   UpdateTaskInput,
+  MoveTaskInput,
   UpdateCommentInput,
+  NotificationPage,
+  NotificationUnreadCount,
+  UpdateOrganizationMemberRoleInput,
+  AttachmentItem,
+  AttachmentPage,
+  ActiveTimerResponse,
+  CreateManualTimeEntryInput,
+  ProjectTimeSummary,
+  TaskTimePage,
+  WikiPage,
+  WikiPageSummary,
+  CreateWikiPageInput,
+  UpdateWikiPageInput,
+  MoveWikiPageInput,
 } from "./types";
 
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
@@ -84,11 +106,15 @@ function errorMessage(payload: ApiErrorPayload): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData =
+    typeof FormData !== "undefined" && init?.body instanceof FormData;
   const res = await fetch(`${API_URL}${path}`, {
     ...init,
     credentials: "include",
     headers: {
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.body && !isFormData
+        ? { "Content-Type": "application/json" }
+        : {}),
       ...init?.headers,
     },
   });
@@ -118,6 +144,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+async function requestBlob(path: string): Promise<Blob> {
+  const response = await fetch(`${API_URL}${path}`, { credentials: "include" });
+  if (!response.ok) {
+    let detail: ApiErrorPayload = {};
+    try {
+      detail = (await response.json()) as ApiErrorPayload;
+    } catch {
+      detail = { message: "Download failed" };
+    }
+    throw new ApiError(response.status, errorMessage(detail), detail);
+  }
+  return response.blob();
+}
+
 function withQuery(path: string, params?: object): string {
   if (!params) return path;
   const search = new URLSearchParams();
@@ -140,6 +180,32 @@ export const api = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+  getOrganizationMembers: (organizationId: string) =>
+    request<OrganizationMember[]>(
+      `/api/organizations/${encodeURIComponent(organizationId)}/members`,
+    ),
+  addOrganizationMember: (
+    organizationId: string,
+    input: AddOrganizationMemberInput,
+  ) =>
+    request<OrganizationMember>(
+      `/api/organizations/${encodeURIComponent(organizationId)}/members`,
+      { method: "POST", body: JSON.stringify(input) },
+    ),
+  updateOrganizationMemberRole: (
+    organizationId: string,
+    memberId: string,
+    input: UpdateOrganizationMemberRoleInput,
+  ) =>
+    request<OrganizationMember>(
+      `/api/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(memberId)}`,
+      { method: "PATCH", body: JSON.stringify(input) },
+    ),
+  removeOrganizationMember: (organizationId: string, memberId: string) =>
+    request<void>(
+      `/api/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(memberId)}`,
+      { method: "DELETE" },
+    ),
 
   // Projects
   getProjects: (organizationId: string) =>
@@ -231,6 +297,40 @@ export const api = {
       ),
     ),
 
+  // GitHub App installations and verified repository connections
+  createGithubInstallUrl: () =>
+    request<GithubInstallUrlResponse>("/api/github/app/install-url", {
+      method: "POST",
+    }),
+  getGithubInstallations: () =>
+    request<GithubInstallation[]>("/api/github/app/installations"),
+  getGithubRepositories: (
+    installationId: string,
+    options: { page?: number; perPage?: number } = {},
+  ) =>
+    request<GithubRepositoryPage>(
+      withQuery(
+        `/api/github/app/installations/${encodeURIComponent(installationId)}/repositories`,
+        options,
+      ),
+    ),
+  getProjectRepository: (projectId: string) =>
+    request<ProjectRepository | null>(
+      `/api/projects/${encodeURIComponent(projectId)}/repository`,
+    ),
+  connectProjectRepository: (
+    projectId: string,
+    input: ConnectGithubRepositoryInput,
+  ) =>
+    request<ProjectRepository>(
+      `/api/projects/${encodeURIComponent(projectId)}/repository`,
+      { method: "POST", body: JSON.stringify(input) },
+    ),
+  disconnectProjectRepository: (projectId: string) =>
+    request<void>(`/api/projects/${encodeURIComponent(projectId)}/repository`, {
+      method: "DELETE",
+    }),
+
   // Tasks
   getTasks: (projectId: string, filters: TaskFilters = {}) =>
     request<Task[]>(
@@ -246,6 +346,11 @@ export const api = {
     }),
   updateTask: (id: string, input: UpdateTaskInput) =>
     request<Task>(`/api/tasks/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+  moveTask: (id: string, input: MoveTaskInput) =>
+    request<Task>(`/api/tasks/${encodeURIComponent(id)}/move`, {
       method: "PATCH",
       body: JSON.stringify(input),
     }),
@@ -282,6 +387,140 @@ export const api = {
       `/api/tasks/${encodeURIComponent(taskId)}/comments/${encodeURIComponent(commentId)}`,
       { method: "DELETE" },
     ),
+
+  // Authenticated Project and Task attachments
+  getProjectAttachments: (
+    projectId: string,
+    options: { cursor?: string; limit?: number } = {},
+  ) =>
+    request<AttachmentPage>(
+      withQuery(
+        `/api/projects/${encodeURIComponent(projectId)}/attachments`,
+        options,
+      ),
+    ),
+  uploadProjectAttachment: (projectId: string, file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<AttachmentItem>(
+      `/api/projects/${encodeURIComponent(projectId)}/attachments`,
+      { method: "POST", body },
+    );
+  },
+  downloadProjectAttachment: (projectId: string, attachmentId: string) =>
+    requestBlob(
+      `/api/projects/${encodeURIComponent(projectId)}/attachments/${encodeURIComponent(attachmentId)}/download`,
+    ),
+  deleteProjectAttachment: (projectId: string, attachmentId: string) =>
+    request<void>(
+      `/api/projects/${encodeURIComponent(projectId)}/attachments/${encodeURIComponent(attachmentId)}`,
+      { method: "DELETE" },
+    ),
+  getTaskAttachments: (
+    taskId: string,
+    options: { cursor?: string; limit?: number } = {},
+  ) =>
+    request<AttachmentPage>(
+      withQuery(
+        `/api/tasks/${encodeURIComponent(taskId)}/attachments`,
+        options,
+      ),
+    ),
+  uploadTaskAttachment: (taskId: string, file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<AttachmentItem>(
+      `/api/tasks/${encodeURIComponent(taskId)}/attachments`,
+      { method: "POST", body },
+    );
+  },
+  downloadTaskAttachment: (taskId: string, attachmentId: string) =>
+    requestBlob(
+      `/api/tasks/${encodeURIComponent(taskId)}/attachments/${encodeURIComponent(attachmentId)}/download`,
+    ),
+  deleteTaskAttachment: (taskId: string, attachmentId: string) =>
+    request<void>(
+      `/api/tasks/${encodeURIComponent(taskId)}/attachments/${encodeURIComponent(attachmentId)}`,
+      { method: "DELETE" },
+    ),
+
+  // Project documentation
+  getWikiPages: (projectId: string) =>
+    request<WikiPageSummary[]>(
+      `/api/projects/${encodeURIComponent(projectId)}/wiki`,
+    ),
+  getWikiPage: (projectId: string, pageId: string) =>
+    request<WikiPage>(
+      `/api/projects/${encodeURIComponent(projectId)}/wiki/${encodeURIComponent(pageId)}`,
+    ),
+  createWikiPage: (projectId: string, input: CreateWikiPageInput) =>
+    request<WikiPage>(`/api/projects/${encodeURIComponent(projectId)}/wiki`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  updateWikiPage: (
+    projectId: string,
+    pageId: string,
+    input: UpdateWikiPageInput,
+  ) =>
+    request<WikiPage>(
+      `/api/projects/${encodeURIComponent(projectId)}/wiki/${encodeURIComponent(pageId)}`,
+      { method: "PATCH", body: JSON.stringify(input) },
+    ),
+  moveWikiPage: (projectId: string, pageId: string, input: MoveWikiPageInput) =>
+    request<WikiPage>(
+      `/api/projects/${encodeURIComponent(projectId)}/wiki/${encodeURIComponent(pageId)}/move`,
+      { method: "PATCH", body: JSON.stringify(input) },
+    ),
+  deleteWikiPage: (projectId: string, pageId: string) =>
+    request<void>(
+      `/api/projects/${encodeURIComponent(projectId)}/wiki/${encodeURIComponent(pageId)}`,
+      { method: "DELETE" },
+    ),
+
+  // Task timers, private entry history and Project aggregates
+  getTaskTime: (
+    taskId: string,
+    options: { cursor?: string; limit?: number } = {},
+  ) =>
+    request<TaskTimePage>(
+      withQuery(`/api/tasks/${encodeURIComponent(taskId)}/time`, options),
+    ),
+  startTaskTimer: (taskId: string, note?: string | null) =>
+    request<ActiveTimerResponse["activeTimer"]>(
+      `/api/tasks/${encodeURIComponent(taskId)}/time/start`,
+      { method: "POST", body: JSON.stringify({ note: note ?? null }) },
+    ),
+  stopTaskTimer: (taskId: string) =>
+    request<NonNullable<ActiveTimerResponse["activeTimer"]>>(
+      `/api/tasks/${encodeURIComponent(taskId)}/time/stop`,
+      { method: "POST", body: JSON.stringify({}) },
+    ),
+  createManualTimeEntry: (taskId: string, input: CreateManualTimeEntryInput) =>
+    request<NonNullable<ActiveTimerResponse["activeTimer"]>>(
+      `/api/tasks/${encodeURIComponent(taskId)}/time`,
+      { method: "POST", body: JSON.stringify(input) },
+    ),
+  getProjectTime: (projectId: string) =>
+    request<ProjectTimeSummary>(
+      `/api/projects/${encodeURIComponent(projectId)}/time`,
+    ),
+  getActiveTimer: () => request<ActiveTimerResponse>("/api/time/active"),
+
+  // Current user's private notifications
+  getNotifications: (options: { cursor?: string; limit?: number } = {}) =>
+    request<NotificationPage>(withQuery("/api/notifications", options)),
+  getNotificationUnreadCount: () =>
+    request<NotificationUnreadCount>("/api/notifications/unread-count"),
+  markNotificationRead: (notificationId: string) =>
+    request<{ id: string; readAt: string }>(
+      `/api/notifications/${encodeURIComponent(notificationId)}/read`,
+      { method: "PATCH" },
+    ),
+  markAllNotificationsRead: () =>
+    request<{ ok: boolean }>("/api/notifications/read-all", {
+      method: "POST",
+    }),
 };
 
 export { API_URL };

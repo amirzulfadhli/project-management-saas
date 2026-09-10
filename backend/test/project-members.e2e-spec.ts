@@ -163,6 +163,9 @@ describe('Project membership administration (e2e)', () => {
     });
     const projectIds = projects.map(({ id }) => id);
     if (projectIds.length > 0) {
+      await prisma.notification.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
       await prisma.activity.deleteMany({
         where: { projectId: { in: projectIds } },
       });

@@ -112,6 +112,9 @@ describe('Activity core backend (e2e)', () => {
         select: { id: true },
       });
       const projectIds = projects.map((project) => project.id);
+      await prisma.notification.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
       await prisma.activity.deleteMany({
         where: {
           OR: [
@@ -196,6 +199,9 @@ describe('Activity core backend (e2e)', () => {
   });
 
   it('isolates cursors and paginates deterministically newest first', async () => {
+    await prisma.notification.deleteMany({
+      where: { projectId: projectB.id },
+    });
     await prisma.activity.deleteMany({ where: { projectId: projectB.id } });
     for (let index = 0; index < 3; index += 1) {
       await prisma.activity.create({

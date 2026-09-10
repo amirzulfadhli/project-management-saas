@@ -21,11 +21,16 @@ import {
   UpdateProjectMemberRoleDto,
 } from './dto/project-member.dto';
 import { ProjectMembersService } from './project-members.service';
+import { RealtimeService } from '../realtime/realtime.service';
+import { RealtimeEventType } from '../realtime/realtime.types';
 
 @UseGuards(AuthGuard)
 @Controller('api/projects/:projectId/members')
 export class ProjectMembersController {
-  constructor(private readonly projectMembersService: ProjectMembersService) {}
+  constructor(
+    private readonly projectMembersService: ProjectMembersService,
+    private readonly realtime: RealtimeService,
+  ) {}
 
   @Get()
   findAll(
@@ -38,18 +43,30 @@ export class ProjectMembersController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  add(
+  async add(
     @CurrentUser() user: AuthenticatedUser,
     @Param('projectId', new ZodValidationPipe(projectMemberIdSchema))
     projectId: string,
     @Body(new ZodValidationPipe(addProjectMemberSchema))
     dto: AddProjectMemberDto,
   ) {
-    return this.projectMembersService.add(user.id, projectId, dto);
+    const member = await this.projectMembersService.add(
+      user.id,
+      projectId,
+      dto,
+    );
+    await this.realtime.publish({
+      projectId,
+      type: RealtimeEventType.PROJECT_MEMBER_ADDED,
+      entity: 'project-member',
+      entityId: member.id,
+      actorId: user.id,
+    });
+    return member;
   }
 
   @Patch(':memberId')
-  updateRole(
+  async updateRole(
     @CurrentUser() user: AuthenticatedUser,
     @Param('projectId', new ZodValidationPipe(projectMemberIdSchema))
     projectId: string,
@@ -58,12 +75,20 @@ export class ProjectMembersController {
     @Body(new ZodValidationPipe(updateProjectMemberRoleSchema))
     dto: UpdateProjectMemberRoleDto,
   ) {
-    return this.projectMembersService.updateRole(
+    const member = await this.projectMembersService.updateRole(
       user.id,
       projectId,
       memberId,
       dto,
     );
+    await this.realtime.publish({
+      projectId,
+      type: RealtimeEventType.PROJECT_MEMBER_ROLE_CHANGED,
+      entity: 'project-member',
+      entityId: memberId,
+      actorId: user.id,
+    });
+    return member;
   }
 
   @Delete(':memberId')
@@ -76,5 +101,13 @@ export class ProjectMembersController {
     memberId: string,
   ) {
     await this.projectMembersService.remove(user.id, projectId, memberId);
+    await this.realtime.reauthorizeProject(projectId);
+    await this.realtime.publish({
+      projectId,
+      type: RealtimeEventType.PROJECT_MEMBER_REMOVED,
+      entity: 'project-member',
+      entityId: memberId,
+      actorId: user.id,
+    });
   }
 }

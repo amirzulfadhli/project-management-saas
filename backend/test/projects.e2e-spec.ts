@@ -146,6 +146,9 @@ describe('Project core lifecycle (e2e)', () => {
     const projectIds = projects.map((project) => project.id);
 
     if (projectIds.length > 0) {
+      await prisma.notification.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
       await prisma.activity.deleteMany({
         where: { projectId: { in: projectIds } },
       });

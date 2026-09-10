@@ -10,6 +10,8 @@ import { AccessService } from '../access/access.service';
 import { ActivitiesService } from '../activities/activities.service';
 import { ActivityEvent } from '../activities/activity.types';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import type { NotificationDelivery } from '../notifications/notification.types';
 import {
   CreateCommentDto,
   ListCommentsQueryDto,
@@ -35,6 +37,7 @@ export class CommentsService {
     private readonly prisma: PrismaService,
     private readonly access: AccessService,
     private readonly activities: ActivitiesService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async findAll(userId: string, taskId: string, query: ListCommentsQueryDto) {
@@ -65,44 +68,66 @@ export class CommentsService {
   }
 
   create(userId: string, taskId: string, dto: CreateCommentDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const projectId = await this.assertTaskAccess(userId, taskId, tx);
+    let notificationDeliveries: NotificationDelivery[] = [];
+    return this.prisma
+      .$transaction(async (tx) => {
+        const task = await this.assertTaskAccess(userId, taskId, tx);
+        let parentAuthorId: string | null = null;
 
-      if (dto.parentId) {
-        const parent = await tx.comment.findUnique({
-          where: { id: dto.parentId },
-          select: { taskId: true },
-        });
-        if (!parent || parent.taskId !== taskId) {
-          throw new BadRequestException(
-            'Parent comment must belong to this task',
-          );
+        if (dto.parentId) {
+          const parent = await tx.comment.findUnique({
+            where: { id: dto.parentId },
+            select: { taskId: true, authorId: true },
+          });
+          if (!parent || parent.taskId !== taskId) {
+            throw new BadRequestException(
+              'Parent comment must belong to this task',
+            );
+          }
+          parentAuthorId = parent.authorId;
         }
-      }
 
-      const comment = await tx.comment.create({
-        data: {
-          content: dto.content,
+        const comment = await tx.comment.create({
+          data: {
+            content: dto.content,
+            taskId,
+            authorId: userId,
+            parentId: dto.parentId ?? null,
+          },
+          select: commentSelect,
+        });
+        await this.activities.record(tx, {
+          type: ActivityEvent.COMMENT_CREATED,
+          description: 'Added a Comment',
+          projectId: task.projectId,
           taskId,
-          authorId: userId,
-          parentId: dto.parentId ?? null,
-        },
-        select: commentSelect,
+          userId,
+          metadata: {
+            commentId: comment.id,
+            parentId: comment.parentId,
+            contentLength: comment.content.length,
+          },
+        });
+        notificationDeliveries = await this.notifications.recordCommentCreated(
+          tx,
+          {
+            actorId: userId,
+            projectId: task.projectId,
+            projectName: task.project.name,
+            taskId,
+            taskTitle: task.title,
+            commentId: comment.id,
+            parentAuthorId,
+            reporterId: task.reporterId,
+            assigneeId: task.assigneeId,
+          },
+        );
+        return this.toResponse(comment);
+      })
+      .then(async (comment) => {
+        await this.notifications.publishCreated(notificationDeliveries);
+        return comment;
       });
-      await this.activities.record(tx, {
-        type: ActivityEvent.COMMENT_CREATED,
-        description: 'Added a Comment',
-        projectId,
-        taskId,
-        userId,
-        metadata: {
-          commentId: comment.id,
-          parentId: comment.parentId,
-          contentLength: comment.content.length,
-        },
-      });
-      return this.toResponse(comment);
-    });
   }
 
   update(
@@ -112,7 +137,7 @@ export class CommentsService {
     dto: UpdateCommentDto,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      const projectId = await this.assertTaskAccess(userId, taskId, tx);
+      const task = await this.assertTaskAccess(userId, taskId, tx);
       await this.lockComment(tx, taskId, commentId);
       const comment = await this.findComment(tx, taskId, commentId);
 
@@ -132,7 +157,7 @@ export class CommentsService {
       await this.activities.record(tx, {
         type: ActivityEvent.COMMENT_UPDATED,
         description: 'Updated a Comment',
-        projectId,
+        projectId: task.projectId,
         taskId,
         userId,
         metadata: {
@@ -147,12 +172,16 @@ export class CommentsService {
 
   async remove(userId: string, taskId: string, commentId: string) {
     await this.prisma.$transaction(async (tx) => {
-      const projectId = await this.assertTaskAccess(userId, taskId, tx);
+      const task = await this.assertTaskAccess(userId, taskId, tx);
       await this.lockComment(tx, taskId, commentId);
       const comment = await this.findComment(tx, taskId, commentId);
 
       if (comment.author.id !== userId) {
-        await this.access.assertProjectMembershipAdmin(userId, projectId, tx);
+        await this.access.assertProjectMembershipAdmin(
+          userId,
+          task.projectId,
+          tx,
+        );
       }
       if (comment.deletedAt) return;
 
@@ -163,7 +192,7 @@ export class CommentsService {
       await this.activities.record(tx, {
         type: ActivityEvent.COMMENT_DELETED,
         description: 'Deleted a Comment',
-        projectId,
+        projectId: task.projectId,
         taskId,
         userId,
         metadata: {
@@ -179,14 +208,20 @@ export class CommentsService {
     userId: string,
     taskId: string,
     database: PrismaService | Prisma.TransactionClient,
-  ): Promise<string> {
+  ) {
     const task = await database.task.findUnique({
       where: { id: taskId },
-      select: { projectId: true },
+      select: {
+        projectId: true,
+        title: true,
+        reporterId: true,
+        assigneeId: true,
+        project: { select: { name: true } },
+      },
     });
     if (!task) throw new NotFoundException('Task not found');
     await this.access.assertProjectAccess(userId, task.projectId, database);
-    return task.projectId;
+    return task;
   }
 
   private async lockComment(

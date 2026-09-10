@@ -45,6 +45,13 @@ export const updateTaskSchema = z.strictObject({
 
 export type UpdateTaskDto = z.infer<typeof updateTaskSchema>;
 
+export const moveTaskSchema = z.strictObject({
+  columnId: z.string().uuid(),
+  targetIndex: z.number().int().min(0),
+});
+
+export type MoveTaskDto = z.infer<typeof moveTaskSchema>;
+
 export const listTasksQuerySchema = z.strictObject({
   projectId: z.string().uuid().optional(),
   columnId: z.string().uuid().optional(),

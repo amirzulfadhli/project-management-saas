@@ -9,7 +9,9 @@ The Task module keeps the repository's established REST lifecycle:
   assignee, priority, and status filters.
 - GET /api/tasks/:id returns Task detail.
 - PATCH /api/tasks/:id updates fields and is also the current move operation
-  when columnId changes.
+  when columnId changes (that compatibility path appends to the destination).
+- PATCH /api/tasks/:id/move reorders within a Column or moves to an explicit
+  destination index.
 - DELETE /api/tasks/:id permanently deletes the Task and returns HTTP 204.
 
 There is no Task archive model or restore route. Delete remains a hard delete
@@ -98,31 +100,43 @@ they never expand its Project boundary.
 
 ## Kanban movement and ordering
 
-Moving a Task is a PATCH that changes columnId after validating the destination
-Column belongs to the Task's existing Project. The update is one atomic
-PostgreSQL row update. Repeating the same move is idempotent and cannot create a
-cross-Project relationship.
+Each Task has a required, zero-based integer `position` that is unique with its
+`columnId`. Dense integers are intentionally simpler than fractional ranks for
+this MVP: every supported mutation leaves each affected Column numbered
+`0..n-1`, and reads use `position` then Task ID as a deterministic tie-breaker.
 
-Task has no position or rank field. The current MVP orders query results by
-createdAt and the frontend groups them by Column. Therefore movement is
-correct but does not support user-defined ordering within a Column. Fractional
-ranking, drag-and-drop ordering, and concurrent reorder conflict handling are
-future workflow concerns.
+`PATCH /api/tasks/:taskId/move` accepts only `columnId` and `targetIndex`.
+Project identity is derived from the stored Task. The destination Column must
+belong to that same Project and Board; an index larger than the destination
+length receives HTTP 400. The legacy update route still accepts `columnId` for
+the Task edit form and appends to that Column, but drag/reorder uses the
+dedicated explicit-index contract.
+
+Create, update/move, and delete lock the owning Project row inside one Prisma
+transaction. That Project-local lock serializes competing ordering mutations,
+including concurrent appends. Reorder first shifts all affected positions into
+a collision-free temporary range and then writes the dense final order. Raw
+ordering updates deliberately avoid changing every Task's `updatedAt`. Domain
+data and `TASK_MOVED` Activity commit or roll back together.
+
+A same-Column reorder creates no Activity because it is presentation order,
+not a collaboration event. A real Column transition emits one `TASK_MOVED`;
+no-op and rejected moves emit nothing. Task deletion closes the source gap in
+the same transaction.
 
 ## Indexes
 
-Task(projectId, createdAt) supports the dominant Project board/list query and
-its newest-first ordering. Task(columnId) supports the existing Column filter
-and foreign-key lookup path.
+Task(projectId, createdAt) supports broad Project access. The unique
+Task(columnId, position) constraint both enforces Column-local order and
+supports ordered Column lookup, replacing the redundant Task(columnId) index.
 
 No assignee index or status/priority indexes were added because current
 repository usage does not establish those as frequent selective queries.
 
 ## Response and permissions decisions
 
-Create, detail, and update return the same Task representation used by list
-items. Column moves use the update route and therefore return that same
-representation. Delete returns no body.
+Create, detail, update, and move return the same Task representation used by
+list items, including `position`. Delete returns no body.
 
 The broad Organization/Project collaboration policy is preserved for Task
 mutation. Task-specific owner/editor roles and advanced RBAC are intentionally
@@ -176,10 +190,13 @@ Create inserts the backend's Task response into only the current Project cache.
 Update replaces that Task with the returned response. Create and delete also
 invalidate the selected Organization's Project list so Task counts refresh.
 
-Column movement uses a small optimistic update: columnId and the compact Column
-reference change together. The previous Project Task array is retained and
-restored if the request fails; the exact Project cache is then refetched from
-the backend. No position or ranking state is invented.
+Board drag-and-drop optimistically updates only
+`["tasks", { projectId }]`: it removes the Task, inserts it at the explicit
+destination index, updates its compact Column reference, and normalizes the two
+visible arrays. A failed 400/403/404/409 restores the complete previous Project
+Task array and surfaces an inline error. Every outcome refetches the exact cache
+so PostgreSQL remains authoritative. The edit form keeps a select-based Column
+movement fallback.
 
 Permanent deletion from the board modal is optimistic because the modal stays
 mounted and can restore the previous cache on failure. Deletion from the
@@ -201,22 +218,24 @@ cannot be undone. The frontend does not imply archive or restore behavior
 because DELETE /api/tasks/:id performs a real deletion.
 
 The frontend Task type now mirrors the compact backend response, including
-Project and Column references, reporter, nullable assignee, workflow/time
-fields, and the existing GitHub/deployment scalar fields. Assignment and status
-editing were not added because those controls did not previously exist.
+`position`, Project and Column references, reporter, nullable assignee,
+workflow/time fields, and the existing GitHub/deployment scalar fields.
 
-The frontend has no dedicated automated test runner. This milestone uses
-TypeScript, ESLint, formatting, production build, source-level query inspection,
-and a live two-Project HTTP lifecycle. Browser click-through remains a manual
-follow-up when browser automation is available.
+The frontend has no dedicated automated test runner. In addition to TypeScript,
+ESLint, formatting, production build, and PostgreSQL lifecycle coverage, the
+ordered board has now passed real Edge acceptance for pointer, touch, and
+keyboard movement. Keyboard focus is restored to the moved handle after the
+server round trip. Failed movement restores the exact Project Task cache and
+refreshes Tasks; stale-resource failures also refresh the exact Project Column
+cache so a removed destination does not remain visible.
 
 ## Task Activity integration
 
-Task create, update, movement, and permanent deletion now write Project-scoped
-Activity in the same interactive Prisma transaction. Update locks the Task,
-validates Column/assignee relationships through that transaction, compares the
-stored before/after values, and emits only real semantic changes. No-op PATCH
-requests create no Activity.
+Task create, update, movement, and permanent deletion write Project-scoped
+Activity in the same interactive Prisma transaction. Ordering mutations lock
+the Project before the Task, validate Column/assignee relationships through
+that transaction, and emit only real semantic changes. No-op PATCH requests and
+same-Column reorder requests create no Activity.
 
 Deletion records the final Task snapshot before deleting it. PostgreSQL then
 sets the Activity `taskId` to null, while required `projectId` and metadata keep

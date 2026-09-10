@@ -13,7 +13,7 @@ export function Modal({
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  size?: "md" | "lg";
+  size?: "md" | "lg" | "xl";
 }) {
   useEffect(() => {
     if (!open) return;
@@ -39,7 +39,7 @@ export function Modal({
         aria-hidden="true"
       />
       <div
-        className={`relative w-full rounded-xl border border-border bg-surface shadow-lg ${size === "lg" ? "max-w-2xl" : "max-w-lg"}`}
+        className={`relative w-full rounded-xl border border-border bg-surface shadow-lg ${size === "xl" ? "max-w-5xl" : size === "lg" ? "max-w-2xl" : "max-w-lg"}`}
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2 className="text-lg font-semibold text-text-primary">{title}</h2>

@@ -18,6 +18,8 @@ backend/generated/
 *.sqlite3
 **/tmp/
 **/temp/
+.flowplan-storage/
+**/.flowplan-storage/
 
 # Secrets: examples are intentionally committed
 .env

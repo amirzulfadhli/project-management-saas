@@ -5,7 +5,7 @@ import { AppModule } from './app.module';
 import { environment } from './config/environment';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.enableShutdownHooks();
 
   app.enableCors({
