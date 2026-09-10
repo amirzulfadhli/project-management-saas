@@ -152,7 +152,9 @@ describe('Realtime collaboration (e2e)', () => {
 
   it('delivers Task mutations after commit, including same-Column reorder', async () => {
     const socket = await connectSocket(collaboratorCookie);
+    const observer = await connectSocket(ownerCookie);
     await subscribe(socket, projectA.id);
+    await subscribe(observer, projectA.id);
 
     const firstEvent = waitForEvent(socket, 'TASK_CREATED');
     const first = await request(baseUrl)
@@ -188,6 +190,21 @@ describe('Realtime collaboration (e2e)', () => {
     expect((await reorderEvent).entityId).toBe(
       (second.body as unknown as { id: string }).id,
     );
+
+    const deletedTaskId = (second.body as unknown as { id: string }).id;
+    const deletedEvent = waitForEvent(observer, 'TASK_DELETED');
+    await request(baseUrl)
+      .delete(`/api/tasks/${deletedTaskId}`)
+      .set('Cookie', collaboratorCookie)
+      .expect(204);
+    await expect(deletedEvent).resolves.toMatchObject({
+      entityId: deletedTaskId,
+      taskId: deletedTaskId,
+    });
+    await request(baseUrl)
+      .get(`/api/tasks/${deletedTaskId}`)
+      .set('Cookie', ownerCookie)
+      .expect(404);
   });
 
   it('isolates Projects and emits nothing for rejected cross-Project movement', async () => {
@@ -225,7 +242,9 @@ describe('Realtime collaboration (e2e)', () => {
 
   it('delivers Column, Comment, Membership, and Project events', async () => {
     const socket = await connectSocket(ownerCookie);
+    const secondSocket = await connectSocket(collaboratorCookie);
     await subscribe(socket, projectA.id);
+    await subscribe(secondSocket, projectA.id);
 
     const columnEvent = waitForEvent(socket, 'COLUMN_CREATED');
     await request(baseUrl)
@@ -251,13 +270,37 @@ describe('Realtime collaboration (e2e)', () => {
       where: { projectId: projectA.id, userId: collaboratorId },
       select: { id: true },
     });
-    const memberEvent = waitForEvent(socket, 'PROJECT_MEMBER_ROLE_CHANGED');
+    const ownerMemberEvent = waitForEvent(
+      socket,
+      'PROJECT_MEMBER_ROLE_CHANGED',
+    );
+    const collaboratorMemberEvent = waitForEvent(
+      secondSocket,
+      'PROJECT_MEMBER_ROLE_CHANGED',
+    );
     await request(baseUrl)
       .patch(`/api/projects/${projectA.id}/members/${member.id}`)
       .set('Cookie', ownerCookie)
       .send({ role: 'OWNER' })
       .expect(200);
-    await memberEvent;
+    await Promise.all([ownerMemberEvent, collaboratorMemberEvent]);
+
+    const removedEvent = waitForEvent(secondSocket, 'PROJECT_MEMBER_REMOVED');
+    await request(baseUrl)
+      .delete(`/api/projects/${projectA.id}/members/${member.id}`)
+      .set('Cookie', ownerCookie)
+      .expect(204);
+    await expect(removedEvent).resolves.toMatchObject({ entityId: member.id });
+
+    const addedEvent = waitForEvent(secondSocket, 'PROJECT_MEMBER_ADDED');
+    const added = await request(baseUrl)
+      .post(`/api/projects/${projectA.id}/members`)
+      .set('Cookie', ownerCookie)
+      .send({ userId: collaboratorId, role: 'MEMBER' })
+      .expect(201);
+    await expect(addedEvent).resolves.toMatchObject({
+      entityId: (added.body as unknown as { id: string }).id,
+    });
 
     const projectEvent = waitForEvent(socket, 'PROJECT_UPDATED');
     await request(baseUrl)

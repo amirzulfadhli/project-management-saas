@@ -10,11 +10,42 @@ The latest verified baseline is 158 backend unit tests, 105 PostgreSQL E2E
 tests, 17 current migrations with no schema drift, and passing frontend
 TypeScript, ESLint, and production build checks.
 
-Consolidated browser QA remains deferred for Realtime, Notifications,
-Organization/Project administration, Files, Wiki, and Time Tracking. Live GitHub App
-verification is blocked on public HTTPS. Coolify staging deployment is paused
-until the external VPS/domain prerequisites are available. These external
-and manual acceptance gates are not claimed complete.
+Consolidated browser QA has begun and the first defect-closure pass now requires
+manual retesting across Realtime, Notifications, Project administration,
+Comments, and Time Tracking. Organization administration, Files, and Wiki also
+retain their manual acceptance backlog. Live GitHub App verification is blocked
+on public HTTPS. Coolify staging deployment is paused until the external
+VPS/domain prerequisites are available. These external and manual acceptance
+gates are not claimed complete.
+
+## V1 manual QA defect closure 1
+
+V1 functional freeze is **REOPENED** after manual acceptance found that several
+implemented capabilities were either hard to discover or did not reconcile an
+already-open surface. The first closure pass makes Active/Archived Projects an
+explicit Projects-page choice, labels the header Notifications entry point,
+and carries Task identity from the Organization Tasks list into the existing
+Task dialog. The Task dialog now labels its Comments, Files, Time tracking, and
+GitHub sections explicitly, so Comments and Task timers are reachable from
+both the board and the top-level Tasks workflow.
+
+Compact `TASK_DELETED` events now remove the deleted Task from the affected
+Project cache immediately. An open/deep-linked Task dialog therefore closes
+when the authoritative Task disappears and displays "This task is no longer
+available." Project-member events explicitly refetch active Project roster and
+detail queries, covering add, role-change, and remove reconciliation for other
+connected clients while the gateway continues to reauthorize revoked access.
+
+Backend persistence and privacy contracts for Comments, Notifications, and
+Time Tracking were already present; this pass does not replace them. In
+particular, Notification `readAt` remains PostgreSQL-backed and user-private.
+Automated regression does not constitute manual acceptance. Focused realtime
+E2E passes 7/7; focused Project, Comment, Notification, membership, and Time
+Tracking E2E passes 36/36; the full backend unit suite passes 158/158; and the
+full PostgreSQL E2E suite passes 105/105. Backend/frontend static checks and
+production builds pass. The pass is therefore **MANUAL QA DEFECT CLOSURE #1
+COMPLETE — RETEST REQUIRED**; functional freeze must not be restored until a
+user retests the affected flows.
 
 ## Production deployment foundation
 

@@ -41,27 +41,48 @@ export default function ProjectsPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Projects</h1>
+          <h1 className="text-2xl font-bold text-text-primary">
+            {showArchived ? "Archived Projects" : "Active Projects"}
+          </h1>
           <p className="text-sm text-text-secondary">
             {selectedOrganization
               ? `Projects in ${selectedOrganization.name}.`
               : "Select an organization to view its projects."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => setShowArchived((current) => !current)}
-            disabled={!selectedOrganizationId}
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            className="flex items-center rounded-md border border-border bg-surface p-1"
+            role="group"
+            aria-label="Project archive view"
           >
-            {showArchived ? "View active" : "View archived"}
-          </Button>
-          <Button
-            onClick={() => setCreateOpen(true)}
-            disabled={!selectedOrganizationId}
-          >
-            New Project
-          </Button>
+            <Button
+              size="sm"
+              variant={showArchived ? "ghost" : "primary"}
+              aria-pressed={!showArchived}
+              onClick={() => setShowArchived(false)}
+              disabled={!selectedOrganizationId}
+            >
+              Active
+            </Button>
+            <Button
+              size="sm"
+              variant={showArchived ? "primary" : "ghost"}
+              aria-pressed={showArchived}
+              onClick={() => setShowArchived(true)}
+              disabled={!selectedOrganizationId}
+            >
+              Archived
+            </Button>
+          </div>
+          {!showArchived ? (
+            <Button
+              onClick={() => setCreateOpen(true)}
+              disabled={!selectedOrganizationId}
+            >
+              New Project
+            </Button>
+          ) : null}
         </div>
       </div>
 

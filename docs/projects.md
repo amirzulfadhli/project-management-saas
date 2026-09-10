@@ -204,9 +204,10 @@ derives the authenticated user from the session and applies its access checks.
 ### Archive language, response typing, and errors
 
 The UI uses Archive, Archived, and Restore because the backend performs a soft
-archive and has no hard-delete route. The Projects screen exposes intentional
-active/archived views. Archived detail remains retrievable, and owner-only
-structural controls match backend authorization.
+archive and has no hard-delete route. The Projects screen exposes an explicit,
+labelled **Active / Archived** selector and changes its heading to match the
+selected view. Archived detail remains retrievable, and owner-only structural
+controls match backend authorization.
 
 ProjectMember.role is typed as OWNER or MEMBER, matching the database enum.
 Create, detail, update, and duplicate are typed as the shared ProjectDetail

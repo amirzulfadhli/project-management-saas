@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import type {
@@ -41,6 +41,7 @@ interface TaskModalState {
 
 export function ProjectBoard({ id }: { id: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { data: session } = authClient.useSession();
   const {
@@ -63,6 +64,7 @@ export function ProjectBoard({ id }: { id: string }) {
   const [wikiOpen, setWikiOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const requestedTaskId = searchParams.get("task");
 
   const project = useQuery({
     queryKey: queryKeys.project(id),
@@ -99,6 +101,29 @@ export function ProjectBoard({ id }: { id: string }) {
     queryFn: () => api.getProjectMembers(currentProjectId!),
     enabled: Boolean(currentProjectId) && projectContextIsReady,
   });
+
+  const requestedTask = requestedTaskId
+    ? tasksQuery.data?.find((task) => task.id === requestedTaskId)
+    : undefined;
+  const requestedTaskIsUnavailable = Boolean(
+    requestedTaskId && tasksQuery.isSuccess && !requestedTask,
+  );
+  const visibleTaskModal: TaskModalState = requestedTaskId
+    ? requestedTask
+      ? { open: true, task: requestedTask }
+      : { open: false, task: null }
+    : taskModal;
+
+  const closeTaskModal = () => {
+    setTaskModal({ open: false, task: null });
+    router.replace(`/projects/${id}`, { scroll: false });
+  };
+
+  const openTaskModal = (task: Task) => {
+    setActionNotice(null);
+    setTaskModal({ open: true, task });
+    router.replace(`/projects/${id}?task=${task.id}`, { scroll: false });
+  };
 
   useEffect(() => {
     if (
@@ -251,7 +276,7 @@ export function ProjectBoard({ id }: { id: string }) {
             size="sm"
             onClick={() => setTimeOpen(true)}
           >
-            Time
+            Time tracking
           </Button>
           <Button
             variant="secondary"
@@ -340,12 +365,18 @@ export function ProjectBoard({ id }: { id: string }) {
         </div>
       </div>
 
-      {actionNotice ? (
+      {actionNotice || requestedTaskIsUnavailable ? (
         <p
-          className="rounded-md border border-success/30 bg-success/5 px-4 py-3 text-sm text-success"
+          className={`rounded-md border px-4 py-3 text-sm ${
+            requestedTaskIsUnavailable
+              ? "border-border bg-surface text-text-secondary"
+              : "border-success/30 bg-success/5 text-success"
+          }`}
           role="status"
         >
-          {actionNotice}
+          {requestedTaskIsUnavailable
+            ? "This task is no longer available."
+            : actionNotice}
         </p>
       ) : null}
 
@@ -401,7 +432,7 @@ export function ProjectBoard({ id }: { id: string }) {
           projectId={data.id}
           columns={columns}
           tasks={tasksQuery.data ?? []}
-          onOpenTask={(task) => setTaskModal({ open: true, task })}
+          onOpenTask={openTaskModal}
           onCreateTask={(columnId) =>
             setTaskModal({
               open: true,
@@ -412,14 +443,14 @@ export function ProjectBoard({ id }: { id: string }) {
         />
       )}
 
-      {taskModal.open ? (
+      {visibleTaskModal.open ? (
         <TaskModal
-          onClose={() => setTaskModal({ open: false, task: null })}
+          onClose={closeTaskModal}
           organizationId={data.organizationId}
           projectId={data.id}
           columns={columns}
-          task={taskModal.task}
-          defaultColumnId={taskModal.defaultColumnId}
+          task={visibleTaskModal.task}
+          defaultColumnId={visibleTaskModal.defaultColumnId}
           eligibleAssignees={eligibleAssignees}
           currentUserId={currentUserId}
           canModerateComments={canAdministerProject}

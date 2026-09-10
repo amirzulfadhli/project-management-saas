@@ -62,8 +62,9 @@ export function TaskRow({
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <Link
-            href={`/projects/${task.projectId}`}
+            href={`/projects/${task.projectId}?task=${task.id}`}
             className="block truncate text-sm font-medium text-text-primary hover:text-primary"
+            aria-label={`Open Task ${task.title}`}
           >
             {task.title}
           </Link>

@@ -31,6 +31,14 @@ interface TaskMutationContext {
   previousTasks?: Task[];
 }
 
+const taskPanels = [
+  { id: "details", label: "Details" },
+  { id: "comments", label: "Comments" },
+  { id: "attachments", label: "Files" },
+  { id: "time", label: "Time tracking" },
+  { id: "github", label: "GitHub" },
+] as const;
+
 export function TaskModal({
   onClose,
   organizationId,
@@ -208,21 +216,12 @@ export function TaskModal({
       }
       return api.deleteTask(task.id);
     },
-    onMutate: async (): Promise<TaskMutationContext> => {
-      if (!task) return {};
-
-      await queryClient.cancelQueries({ queryKey: listKey, exact: true });
-      const previousTasks = queryClient.getQueryData<Task[]>(listKey);
-      if (previousTasks) {
-        queryClient.setQueryData<Task[]>(
-          listKey,
-          previousTasks.filter((item) => item.id !== task.id),
-        );
-      }
-      return { previousTasks };
-    },
     onSuccess: async () => {
+      onClose();
       if (task) {
+        queryClient.setQueryData<Task[]>(listKey, (current) =>
+          current?.filter((item) => item.id !== task.id),
+        );
         queryClient.removeQueries({
           queryKey: queryKeys.taskComments(task.id),
           exact: true,
@@ -241,12 +240,8 @@ export function TaskModal({
           exact: true,
         }),
       ]);
-      onClose();
     },
-    onError: (mutationError: unknown, _input, context) => {
-      if (context?.previousTasks) {
-        queryClient.setQueryData(listKey, context.previousTasks);
-      }
+    onError: (mutationError: unknown) => {
       setError(
         mutationError instanceof ApiError
           ? mutationError.message
@@ -307,24 +302,22 @@ export function TaskModal({
           role="tablist"
           aria-label="Task sections"
         >
-          {(
-            ["details", "comments", "attachments", "time", "github"] as const
-          ).map((panel) => (
+          {taskPanels.map((panel) => (
             <button
-              key={panel}
-              id={`task-${panel}-tab`}
+              key={panel.id}
+              id={`task-${panel.id}-tab`}
               type="button"
               role="tab"
-              aria-selected={activePanel === panel}
-              aria-controls={`task-${panel}-panel`}
-              onClick={() => setActivePanel(panel)}
-              className={`min-w-24 flex-1 rounded-sm px-3 py-2 text-sm font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                activePanel === panel
+              aria-selected={activePanel === panel.id}
+              aria-controls={`task-${panel.id}-panel`}
+              onClick={() => setActivePanel(panel.id)}
+              className={`min-w-24 flex-1 rounded-sm px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                activePanel === panel.id
                   ? "bg-surface text-text-primary shadow-sm"
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
-              {panel}
+              {panel.label}
             </button>
           ))}
         </div>

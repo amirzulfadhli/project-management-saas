@@ -65,20 +65,22 @@ cannot select this room. After commit, the backend emits only a compact
 `NOTIFICATION_CREATED` invalidation containing the Notification ID and event
 timestamp to the recipient room; it is never broadcast to a Project room.
 
-The application header contains a keyboard-accessible bell and unread badge.
+The application header contains a keyboard-accessible bell, a visible
+**Notifications** label at normal desktop widths, and an unread badge.
 Its responsive panel lists newest items first, supports cursor-based “Load
 more”, individual read, mark-all-read, retry/error/empty states, and Project
 navigation. Unknown or deleted targets degrade to stable historical messages.
 Realtime events invalidate only the inbox and unread-count caches.
+Individual and bulk read actions persist `readAt` through the authenticated
+backend; refresh and account switching never depend on client-only read state.
 
 ## Intentional limitations
 
 There are no email, browser/mobile push, digests, preferences, per-event mute,
 scheduled jobs, Redis, or BullMQ. Navigation targets the containing Project
-rather than opening a Task/Comment deep link. Browser interaction acceptance is
-deferred to the consolidated manual QA milestone; automated backend, database,
-TypeScript, lint, formatting, and production-build verification cover this
-milestone.
+rather than opening a Task/Comment deep link. Manual notification discovery,
+read-state refresh, and two-account isolation must be retested after V1 manual
+QA defect closure 1; automated verification does not claim that acceptance.
 
 Organization membership changes do not currently create notifications.
 Notification.projectId is required, and assigning an arbitrary Project to an

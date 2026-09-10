@@ -169,6 +169,10 @@ The Tasks page and Overview are Organization-level views, but they no longer
 call the backend's unscoped Task list. They load the selected Organization's
 active Projects and compose their Tasks from one Project-scoped query per
 Project. Those calls share the same cache entries used by Project boards.
+Task titles on the top-level Tasks page preserve the selected Task identity in
+the Project URL and open the same Task dialog used by the board. Comments,
+Files, Time tracking, and GitHub linkage are therefore reachable from either
+Task entry path.
 
 ## Frontend-derived IDs and Columns
 
@@ -199,11 +203,13 @@ Task array and surfaces an inline error. Every outcome refetches the exact cache
 so PostgreSQL remains authoritative. The edit form keeps a select-based Column
 movement fallback.
 
-Permanent deletion from the board modal is optimistic because the modal stays
-mounted and can restore the previous cache on failure. Deletion from the
-Organization Tasks page waits for success before removing the row, ensuring an
-inline backend error remains visible. Both paths invalidate only the affected
-Project Task cache.
+Permanent deletion from the board modal waits for backend success before
+removing the row, ensuring a failed deletion leaves the open Task and its error
+state intact. Deletion from the Organization Tasks page follows the same
+authoritative-success policy. Both paths invalidate only the affected Project
+Task cache. For collaborator deletion, the compact realtime event removes the
+Task from that Project cache immediately; an open or deep-linked dialog closes
+and the board shows "This task is no longer available."
 
 ## Forms, dates, and destructive actions
 

@@ -192,11 +192,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           break;
         case "project-member":
           void Promise.all([
-            queryClient.invalidateQueries({
+            queryClient.refetchQueries({
               queryKey: queryKeys.projectMembers(event.projectId),
               exact: true,
             }),
-            queryClient.invalidateQueries({
+            queryClient.refetchQueries({
               queryKey: queryKeys.project(event.projectId),
               exact: true,
             }),
@@ -219,6 +219,16 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           ]);
           break;
         case "task":
+          if (event.type === realtimeEventTypes.TASK_DELETED && event.taskId) {
+            queryClient.setQueriesData<Task[]>(
+              { queryKey: queryKeys.tasks(event.projectId) },
+              (current) => current?.filter((task) => task.id !== event.taskId),
+            );
+            queryClient.removeQueries({
+              queryKey: queryKeys.taskComments(event.taskId),
+              exact: true,
+            });
+          }
           void Promise.all([
             queryClient.invalidateQueries({
               queryKey: queryKeys.tasks(event.projectId),

@@ -142,7 +142,7 @@ export function NotificationBell() {
           setMutationError(null);
           setOpen((value) => !value);
         }}
-        className="relative flex h-10 w-10 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="relative flex h-10 items-center justify-center gap-2 rounded-md px-2 text-text-secondary transition-colors hover:bg-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:px-3"
       >
         <svg
           aria-hidden="true"
@@ -155,6 +155,9 @@ export function NotificationBell() {
           <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
           <path d="M10 21h4" />
         </svg>
+        <span className="hidden text-sm font-medium sm:inline">
+          Notifications
+        </span>
         {count > 0 ? (
           <span className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-semibold leading-4 text-white">
             {count > 99 ? "99+" : count}

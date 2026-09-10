@@ -71,10 +71,12 @@ No notes or durations are broadcast. The frontend invalidates only the
 affected user's active-timer cache, affected Task time cache, and Project time
 summary. Realtime failure never prevents REST persistence.
 
-The Task modal has a compact **Time** tab for totals, start/stop, manual entry,
-and the caller's recent history. The Project **Time** dialog shows the total,
-caller contribution, per-Task totals, and owner-only collaborator totals.
-Manual browser acceptance is deferred to the consolidated QA milestone.
+The existing Task dialog has an explicit **Time tracking** tab for totals,
+start/stop, manual entry, and the caller's recent history. Task links from the
+top-level Tasks page preserve Task identity and open this same dialog. The
+Project header uses a labelled **Time tracking** action for total, caller
+contribution, per-Task totals, and owner-only collaborator totals. Manual
+browser retesting remains required after the first V1 QA defect-closure pass.
 
 ## Known limitations
 

@@ -74,9 +74,12 @@ as Redis; the current single-backend MVP does not require Redis.
 coherent and unsubscribes on navigation. One provider listener maps events to
 Project-scoped TanStack Query keys:
 
-- Task -> that Project's Tasks, detail, and Activity
+- Task -> that Project's Tasks, detail, and Activity. A delete removes the Task
+  from cached Project lists immediately, so an open Task surface can close
+  before the authoritative refetch completes.
 - Column -> that Project's Columns and detail
-- Project member -> that Project's roster, detail, and Activity
+- Project member -> an immediate active-query refetch for that Project's
+  roster and detail, plus Activity invalidation
 - Comment -> that Task's Comments and that Project's Activity
 - repository -> that Project's repository and Activity
 - GitHub Issue -> that user's Project Issue discovery, affected Task link,
@@ -107,6 +110,12 @@ after commit. This preserves access whenever another explicit or inherited
 path remains, while evicting a socket once all access paths are gone.
 An evicted client receives `project:access-revoked`, leaves the room, and
 refetches authoritative REST state.
+
+Project-member add, role-change, and remove events are delivered to other
+authorized room subscribers. Active roster/detail queries refetch immediately;
+a removal that eliminates the affected user's final access path is
+handled by the separate revocation event rather than leaking a private roster
+event.
 
 REST controllers and domain services remain authoritative for every mutation.
 Realtime adds no new Project, Task, Column, membership, Comment, or repository
