@@ -12,6 +12,7 @@ const activityDefinitions: Record<string, ActivityDefinition> = {
   PROJECT_CREATED: { fallback: "created the Project", category: "project" },
   PROJECT_UPDATED: { fallback: "updated the Project", category: "project" },
   PROJECT_ARCHIVED: { fallback: "archived the Project", category: "project" },
+  PROJECT_RESTORED: { fallback: "restored the Project", category: "project" },
   PROJECT_DUPLICATED: {
     fallback: "duplicated the Project",
     category: "project",

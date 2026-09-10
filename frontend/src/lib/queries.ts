@@ -12,8 +12,10 @@ export const queryKeys = {
   organizationMembers: (organizationId: string) =>
     ["organization-members", { organizationId }] as const,
   projectLists: ["projects"] as const,
-  projects: (organizationId: string) =>
+  organizationProjects: (organizationId: string) =>
     ["projects", { organizationId }] as const,
+  projects: (organizationId: string, archived = false) =>
+    ["projects", { organizationId }, { archived }] as const,
   project: (id: string) => ["project", id] as const,
   projectColumns: (projectId: string) =>
     ["project-columns", { projectId }] as const,

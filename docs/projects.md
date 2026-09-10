@@ -54,8 +54,8 @@ delete the Project, Board, Columns, or related history.
 
 GET /api/projects returns active Projects by default. The equivalent explicit
 query is archived=false. Passing archived=true returns archived Projects only.
-Both forms can be combined with organizationId. There is no hard-delete or
-restore workflow in this milestone.
+Both forms can be combined with organizationId. `POST /api/projects/:id/restore`
+clears `archivedAt`; there is no hard-delete route.
 
 ## Response contracts
 
@@ -65,12 +65,14 @@ Project mutation responses now match the detail route:
 - GET /api/projects/:id returns full Project detail.
 - PATCH /api/projects/:id returns full Project detail.
 - POST /api/projects/:id/duplicate returns full Project detail.
+- POST /api/projects/:id/restore returns full Project detail.
 - DELETE /api/projects/:id returns HTTP 204.
 
 Full detail includes Organization, optional Team, ProjectMembers with their
 Users, and the Main Board with ordered Columns and task counts. GET
 /api/projects remains a lighter summary list with Organization, optional Team,
-and task/member counts.
+task/member counts, and only the current user's explicit Project role for
+owner-control presentation.
 
 This keeps a single mutation/detail contract without extra follow-up requests:
 Prisma includes the detail relations in the create, update, and duplicate
@@ -103,25 +105,22 @@ organization collaboration model:
 - any Organization member has Project access;
 - an explicit ProjectMember has Project access.
 
-The same rule currently applies to read, update, archive, and duplicate
-operations. This was preserved because the repository has no established
-Project permission policy distinguishing readers from editors. Owner-only or
-role-specific mutations belong to a future RBAC milestone; client-side roles
-must not invent that policy.
+Read access uses any inherited Organization membership or explicit Project
+membership. Structural administration is narrower: update, archive, restore,
+and duplicate require Organization `OWNER` or explicit Project `OWNER`.
+Ordinary collaborators retain Task collaboration access but cannot administer
+the Project merely through inherited access. See `docs/authorization.md`.
 
-## Membership administration preparation
+## Membership administration
 
-The Project membership audit and backend design are complete, but no public
-membership-administration routes have been added. The finalized policy keeps
-Organization-level inherited access and treats `ProjectMember` as an explicit
-roster/role record. Organization owners and Project `OWNER`s will administer
-the roster; self-removal will be allowed when it does not remove the last
-Project owner; additions will be limited to Users already belonging to the
-owning Organization.
+Organization-level inherited access remains distinct from explicit
+`ProjectMember` roster/role records. Organization owners and explicit Project
+`OWNER`s administer the roster; self-removal is allowed only when it does not
+remove the final Project owner, and additions are limited to users already
+belonging to the owning Organization. Full contracts and verification are in
+`docs/project-membership.md`.
 
-The exact routes, DTOs, status codes, transaction/locking strategy, Task
-assignment decision, and PostgreSQL e2e matrix are recorded in
-`docs/project-membership.md`. The intended mutation flow is:
+The mutation flow is:
 
     Authenticated request
       -> Project membership-admin authorization
@@ -130,7 +129,7 @@ assignment decision, and PostgreSQL e2e matrix are recorded in
       -> transaction
       -> ProjectMember mutation
 
-Existing Task assignments will not be silently cascaded when an explicit
+Existing Task assignments are not silently cascaded when an explicit
 membership is removed. A User who remains an Organization member keeps both
 the assignment and inherited Project access.
 
@@ -183,8 +182,9 @@ for the affected organization.
 
 Archive is slightly different. DELETE /api/projects/:id returns no body, so the
 active list cache first removes the archived Project directly for immediate UI
-feedback, then refetches that same organization list. Direct cache removal
-makes the interface responsive; invalidation confirms it against the backend.
+feedback. Archive and restore then invalidate the affected Organization's
+active and archived list variants. Project-list keys include the archive mode,
+so the two views cannot reuse stale results.
 
 ### Detail navigation and selection
 
@@ -203,9 +203,10 @@ derives the authenticated user from the session and applies its access checks.
 
 ### Archive language, response typing, and errors
 
-The UI uses Archive and Archived because the backend performs soft archive and
-has no hard-delete route. Archived detail remains retrievable, but archived
-Projects disappear from normal active lists.
+The UI uses Archive, Archived, and Restore because the backend performs a soft
+archive and has no hard-delete route. The Projects screen exposes intentional
+active/archived views. Archived detail remains retrievable, and owner-only
+structural controls match backend authorization.
 
 ProjectMember.role is typed as OWNER or MEMBER, matching the database enum.
 Create, detail, update, and duplicate are typed as the shared ProjectDetail

@@ -109,6 +109,10 @@ export class ProjectsService {
       include: {
         organization: { select: { id: true, name: true, slug: true } },
         team: { select: { id: true, name: true } },
+        projectMembers: {
+          where: { userId },
+          select: { userId: true, role: true },
+        },
         _count: { select: { tasks: true, projectMembers: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -127,7 +131,7 @@ export class ProjectsService {
   async update(userId: string, id: string, dto: UpdateProjectDto) {
     return this.prisma.$transaction(async (tx) => {
       await this.lockProject(tx, id);
-      await this.access.assertProjectAccess(userId, id, tx);
+      await this.access.assertProjectOwnerAuthority(userId, id, tx);
       const before = await tx.project.findUniqueOrThrow({ where: { id } });
       const updated = await tx.project.update({
         where: { id },
@@ -172,7 +176,7 @@ export class ProjectsService {
   async archive(userId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
       await this.lockProject(tx, id);
-      await this.access.assertProjectAccess(userId, id, tx);
+      await this.access.assertProjectOwnerAuthority(userId, id, tx);
       const before = await tx.project.findUniqueOrThrow({ where: { id } });
       if (before.archivedAt) return before;
 
@@ -191,10 +195,38 @@ export class ProjectsService {
     });
   }
 
+  async restore(userId: string, id: string) {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockProject(tx, id);
+      await this.access.assertProjectOwnerAuthority(userId, id, tx);
+      const before = await tx.project.findUniqueOrThrow({ where: { id } });
+      if (!before.archivedAt) {
+        return tx.project.findUniqueOrThrow({
+          where: { id },
+          include: projectDetailInclude(id),
+        });
+      }
+
+      const restored = await tx.project.update({
+        where: { id },
+        data: { archivedAt: null },
+        include: projectDetailInclude(id),
+      });
+      await this.activities.record(tx, {
+        type: ActivityEvent.PROJECT_RESTORED,
+        description: `Restored Project "${restored.name}"`,
+        projectId: id,
+        userId,
+        metadata: { archivedAt: before.archivedAt.toISOString() },
+      });
+      return restored;
+    });
+  }
+
   async duplicate(userId: string, id: string) {
     return this.prisma.$transaction(async (tx) => {
       await this.lockProject(tx, id);
-      await this.access.assertProjectAccess(userId, id, tx);
+      await this.access.assertProjectOwnerAuthority(userId, id, tx);
       const source = await tx.project.findUnique({
         where: { id },
         include: {

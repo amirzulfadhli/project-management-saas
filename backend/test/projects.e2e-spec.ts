@@ -152,6 +152,9 @@ describe('Project core lifecycle (e2e)', () => {
       await prisma.activity.deleteMany({
         where: { projectId: { in: projectIds } },
       });
+      await prisma.task.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
       await prisma.column.deleteMany({
         where: { projectId: { in: projectIds } },
       });
@@ -176,8 +179,9 @@ describe('Project core lifecycle (e2e)', () => {
 
   async function createProject(
     name = 'Core Roadmap',
+    client = memberClient,
   ): Promise<ProjectResponse> {
-    const response = await memberClient
+    const response = await client
       .post('/api/projects')
       .send({ name, description: 'Project lifecycle test', organizationId })
       .expect(201);
@@ -287,8 +291,45 @@ describe('Project core lifecycle (e2e)', () => {
     expect(updated.board.columns).toHaveLength(6);
   });
 
+  it('limits Project administration to an Organization OWNER or explicit Project OWNER', async () => {
+    const project = await createProject('Owner Administered', ownerClient);
+
+    await memberClient
+      .patch('/api/projects/' + project.id)
+      .send({ name: 'Unauthorized rename' })
+      .expect(403);
+    await memberClient.delete('/api/projects/' + project.id).expect(403);
+    await memberClient
+      .post('/api/projects/' + project.id + '/duplicate')
+      .expect(403);
+
+    await ownerClient
+      .patch('/api/projects/' + project.id)
+      .send({ name: 'Owner renamed' })
+      .expect(200);
+    await ownerClient.delete('/api/projects/' + project.id).expect(204);
+    await memberClient
+      .post('/api/projects/' + project.id + '/restore')
+      .expect(403);
+    await ownerClient
+      .post('/api/projects/' + project.id + '/restore')
+      .expect(200);
+    await ownerClient
+      .post('/api/projects/' + project.id + '/duplicate')
+      .expect(201);
+  });
+
   it('soft-archives a Project and exposes it only through archived=true', async () => {
     const project = await createProject();
+    const taskResponse = await memberClient
+      .post('/api/tasks')
+      .send({
+        title: 'Preserved Task',
+        projectId: project.id,
+        columnId: project.board.columns[0].id,
+      })
+      .expect(201);
+    const taskId = (taskResponse.body as { id: string }).id;
 
     await memberClient.delete('/api/projects/' + project.id).expect(204);
 
@@ -309,6 +350,36 @@ describe('Project core lifecycle (e2e)', () => {
     });
     expect(storedProject?.archivedAt).toBeInstanceOf(Date);
     await memberClient.get('/api/projects/' + project.id).expect(200);
+
+    const restoredResponse = await memberClient
+      .post('/api/projects/' + project.id + '/restore')
+      .expect(200);
+    expect(restoredResponse.body).toMatchObject({
+      id: project.id,
+      archivedAt: null,
+      board: { id: project.board.id },
+    });
+    expect(
+      (restoredResponse.body as ProjectResponse).projectMembers,
+    ).toContainEqual(
+      expect.objectContaining({ userId: memberId, role: ProjectRole.OWNER }),
+    );
+    expect(
+      await prisma.task.findUnique({ where: { id: taskId } }),
+    ).toMatchObject({ id: taskId, projectId: project.id });
+
+    const activeAfterRestore = await memberClient
+      .get('/api/projects?organizationId=' + organizationId)
+      .expect(200);
+    expect(
+      (activeAfterRestore.body as ProjectResponse[]).map((item) => item.id),
+    ).toContain(project.id);
+    const archivedAfterRestore = await memberClient
+      .get('/api/projects?organizationId=' + organizationId + '&archived=true')
+      .expect(200);
+    expect(
+      (archivedAfterRestore.body as ProjectResponse[]).map((item) => item.id),
+    ).not.toContain(project.id);
   });
 
   it('duplicates the Project structure without changing the source', async () => {
@@ -359,5 +430,31 @@ describe('Project core lifecycle (e2e)', () => {
         where: { organizationId },
       }),
     ).toBe(2);
+    expect(await prisma.task.count({ where: { projectId: copy.id } })).toBe(0);
+    expect(await prisma.file.count({ where: { projectId: copy.id } })).toBe(0);
+    expect(await prisma.wikiPage.count({ where: { projectId: copy.id } })).toBe(
+      0,
+    );
+    expect(
+      await prisma.timeEntry.count({ where: { projectId: copy.id } }),
+    ).toBe(0);
+    expect(await prisma.issue.count({ where: { projectId: copy.id } })).toBe(0);
+    expect(
+      await prisma.repository.count({ where: { projectId: copy.id } }),
+    ).toBe(0);
+    expect(
+      await prisma.projectMember.count({ where: { projectId: copy.id } }),
+    ).toBe(1);
+    expect(
+      await prisma.activity.findMany({
+        where: { projectId: copy.id },
+        select: { type: true },
+      }),
+    ).toEqual([{ type: 'PROJECT_DUPLICATED' }]);
+    expect(
+      await prisma.notification.count({
+        where: { projectId: { in: [source.id, copy.id] } },
+      }),
+    ).toBe(0);
   });
 });

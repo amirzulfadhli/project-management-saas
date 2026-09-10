@@ -11,24 +11,35 @@ import { ErrorState } from "@/components/ui/error-state";
 import { ProjectCard } from "@/components/projects/project-card";
 import { CreateProjectModal } from "@/components/projects/create-project-modal";
 import { useOrganization } from "@/components/organizations/organization-provider";
+import { authClient } from "@/lib/auth-client";
 
 export default function ProjectsPage() {
   const [createOpen, setCreateOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [notice, setNotice] = useState<{
     organizationId: string;
     message: string;
   } | null>(null);
   const { selectedOrganization, selectedOrganizationId } = useOrganization();
+  const { data: session } = authClient.useSession();
 
   const projects = useQuery({
-    queryKey: queryKeys.projects(selectedOrganizationId ?? "none"),
-    queryFn: () => api.getProjects(selectedOrganizationId!),
+    queryKey: queryKeys.projects(
+      selectedOrganizationId ?? "none",
+      showArchived,
+    ),
+    queryFn: () => api.getProjects(selectedOrganizationId!, showArchived),
     enabled: Boolean(selectedOrganizationId),
   });
+  const isOrganizationOwner = Boolean(
+    selectedOrganization?.members?.some(
+      (member) => member.userId === session?.user.id && member.role === "OWNER",
+    ),
+  );
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Projects</h1>
           <p className="text-sm text-text-secondary">
@@ -37,12 +48,21 @@ export default function ProjectsPage() {
               : "Select an organization to view its projects."}
           </p>
         </div>
-        <Button
-          onClick={() => setCreateOpen(true)}
-          disabled={!selectedOrganizationId}
-        >
-          New Project
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setShowArchived((current) => !current)}
+            disabled={!selectedOrganizationId}
+          >
+            {showArchived ? "View active" : "View archived"}
+          </Button>
+          <Button
+            onClick={() => setCreateOpen(true)}
+            disabled={!selectedOrganizationId}
+          >
+            New Project
+          </Button>
+        </div>
       </div>
 
       {notice && notice.organizationId === selectedOrganizationId ? (
@@ -73,6 +93,14 @@ export default function ProjectsPage() {
             <ProjectCard
               key={project.id}
               project={project}
+              canAdminister={
+                isOrganizationOwner ||
+                project.projectMembers.some(
+                  (member) =>
+                    member.userId === session?.user.id &&
+                    member.role === "OWNER",
+                )
+              }
               onNotice={(message) =>
                 setNotice({
                   organizationId: project.organizationId,
@@ -84,20 +112,24 @@ export default function ProjectsPage() {
         </div>
       ) : (
         <EmptyState
-          title="No projects yet"
+          title={showArchived ? "No archived projects" : "No projects yet"}
           description={
-            selectedOrganization
-              ? `Create the first project for ${selectedOrganization.name}. A board and default columns are set up automatically.`
-              : "Select an organization to get started."
+            showArchived
+              ? "Archived projects remain preserved and can be restored by an owner."
+              : selectedOrganization
+                ? `Create the first project for ${selectedOrganization.name}. A board and default columns are set up automatically.`
+                : "Select an organization to get started."
           }
           action={
-            <Button
-              variant="secondary"
-              onClick={() => setCreateOpen(true)}
-              disabled={!selectedOrganizationId}
-            >
-              New Project
-            </Button>
+            !showArchived ? (
+              <Button
+                variant="secondary"
+                onClick={() => setCreateOpen(true)}
+                disabled={!selectedOrganizationId}
+              >
+                New Project
+              </Button>
+            ) : undefined
           }
         />
       )}

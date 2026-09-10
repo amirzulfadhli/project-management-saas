@@ -173,10 +173,23 @@ export function ProjectBoard({ id }: { id: string }) {
           (current) => current?.filter((item) => item.id !== id),
         );
         await queryClient.invalidateQueries({
-          queryKey: queryKeys.projects(projectOrganizationId),
+          queryKey: queryKeys.organizationProjects(projectOrganizationId),
         });
       }
       router.push("/projects");
+    },
+  });
+
+  const restore = useMutation({
+    mutationFn: () => api.restoreProject(id),
+    onSuccess: async (restored) => {
+      queryClient.setQueryData(queryKeys.project(id), restored);
+      if (projectOrganizationId) {
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.organizationProjects(projectOrganizationId),
+        });
+      }
+      setActionNotice(`"${restored.name}" restored.`);
     },
   });
 
@@ -185,13 +198,13 @@ export function ProjectBoard({ id }: { id: string }) {
     onSuccess: async (copy) => {
       queryClient.setQueryData(queryKeys.project(copy.id), copy);
       await queryClient.invalidateQueries({
-        queryKey: queryKeys.projects(copy.organizationId),
+        queryKey: queryKeys.organizationProjects(copy.organizationId),
       });
       setActionNotice(`"${copy.name}" created.`);
     },
   });
 
-  const actionError = archive.error ?? duplicate.error;
+  const actionError = archive.error ?? restore.error ?? duplicate.error;
 
   if (project.isPending) {
     return (
@@ -268,13 +281,15 @@ export function ProjectBoard({ id }: { id: string }) {
           >
             Activity
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setColumnsOpen(true)}
-          >
-            Columns
-          </Button>
+          {canAdministerProject ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setColumnsOpen(true)}
+            >
+              Columns
+            </Button>
+          ) : null}
           <Button
             variant="secondary"
             size="sm"
@@ -282,22 +297,26 @@ export function ProjectBoard({ id }: { id: string }) {
           >
             Members
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setEditOpen(true)}
-          >
-            Edit
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => duplicate.mutate()}
-            disabled={duplicate.isPending}
-          >
-            {duplicate.isPending ? "Duplicating…" : "Duplicate"}
-          </Button>
-          {!data.archivedAt ? (
+          {canAdministerProject ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setEditOpen(true)}
+            >
+              Edit
+            </Button>
+          ) : null}
+          {canAdministerProject ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => duplicate.mutate()}
+              disabled={duplicate.isPending}
+            >
+              {duplicate.isPending ? "Duplicating…" : "Duplicate"}
+            </Button>
+          ) : null}
+          {canAdministerProject && !data.archivedAt ? (
             <Button
               variant="ghost"
               size="sm"
@@ -307,6 +326,15 @@ export function ProjectBoard({ id }: { id: string }) {
               disabled={archive.isPending}
             >
               {archive.isPending ? "Archiving..." : "Archive"}
+            </Button>
+          ) : canAdministerProject ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => restore.mutate()}
+              disabled={restore.isPending}
+            >
+              {restore.isPending ? "Restoring..." : "Restore"}
             </Button>
           ) : null}
         </div>
@@ -453,7 +481,7 @@ export function ProjectBoard({ id }: { id: string }) {
         />
       ) : null}
 
-      {columnsOpen ? (
+      {columnsOpen && canAdministerProject ? (
         <ProjectColumnsModal
           open
           onClose={() => setColumnsOpen(false)}
@@ -461,7 +489,7 @@ export function ProjectBoard({ id }: { id: string }) {
         />
       ) : null}
 
-      {editOpen ? (
+      {editOpen && canAdministerProject ? (
         <EditProjectModal
           onClose={() => setEditOpen(false)}
           projectId={id}
@@ -502,7 +530,7 @@ function EditProjectModal({
       queryClient.setQueryData(queryKeys.project(projectId), updatedProject);
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: queryKeys.projects(organizationId),
+          queryKey: queryKeys.organizationProjects(organizationId),
         }),
         queryClient.invalidateQueries({
           queryKey: queryKeys.projectActivities(projectId),

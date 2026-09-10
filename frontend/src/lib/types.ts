@@ -81,6 +81,7 @@ export interface ProjectSummary {
   archivedAt: string | null;
   organization: ProjectOrganizationRef;
   team: ProjectTeamRef | null;
+  projectMembers: Array<{ userId: string; role: ProjectRole }>;
   _count: { tasks: number; projectMembers: number };
 }
 
@@ -121,7 +122,6 @@ export interface Task {
   assigneeId: string | null;
   reporterId: string;
   priority: number;
-  status: string;
   position: number;
   dueDate: string | null;
   estimatedTime: number | null;
@@ -190,7 +190,6 @@ export interface CreateTaskInput {
   columnId: string;
   assigneeId?: string;
   priority?: number;
-  status?: string;
   dueDate?: string;
   estimatedTime?: number;
   startDate?: string;
@@ -202,7 +201,6 @@ export interface UpdateTaskInput {
   columnId?: string;
   assigneeId?: string | null;
   priority?: number;
-  status?: string;
   dueDate?: string | null;
   estimatedTime?: number | null;
   actualTime?: number | null;
@@ -219,7 +217,6 @@ export interface TaskFilters {
   columnId?: string;
   assigneeId?: string;
   priority?: number;
-  status?: string;
 }
 
 export interface ActivityTaskRef {

@@ -6,7 +6,7 @@ The Task module keeps the repository's established REST lifecycle:
 
 - POST /api/tasks creates a Task.
 - GET /api/tasks lists accessible Tasks with optional Project, Column,
-  assignee, priority, and status filters.
+  assignee, and priority filters.
 - GET /api/tasks/:id returns Task detail.
 - PATCH /api/tasks/:id updates fields and is also the current move operation
   when columnId changes (that compatibility path appends to the destination).
@@ -78,11 +78,12 @@ Task date inputs accept either a real ISO calendar date such as 2026-09-30 or
 an ISO datetime with an offset such as 2026-09-30T12:30:00.000Z. Invalid
 calendar dates such as 2026-02-30 are rejected before Prisma receives them.
 
-Priority remains the existing integer scale from 1 through 4. Status remains a
-trimmed, non-empty string with a 50-character limit. No Prisma status enum was
-introduced because the repository establishes Columns as the canonical Kanban
-workflow and does not define one complete status domain. Converting the
-partially used status metadata to a guessed enum would be speculative.
+Priority remains the existing integer scale from 1 through 4. Board Column and
+Column-local position are the canonical workflow state. The legacy database
+`status` scalar remains temporarily for non-destructive compatibility, but it
+is read-only legacy data: supported create/update/list DTOs reject it, Task
+movement does not change it, and frontend types do not expose it. No guessed
+status enum or destructive data rewrite was introduced.
 
 ## Listing semantics
 
@@ -95,8 +96,8 @@ access. Tasks from archived Projects are excluded from this broad default list.
 An explicitly Project-scoped request can still retrieve Tasks for an archived
 Project, matching the existing ability to open archived Project detail.
 
-Assignee, priority, and status filters narrow the already authorized result;
-they never expand its Project boundary.
+Assignee and priority filters narrow the already authorized result; they never
+expand its Project boundary.
 
 ## Kanban movement and ordering
 
@@ -219,7 +220,8 @@ because DELETE /api/tasks/:id performs a real deletion.
 
 The frontend Task type now mirrors the compact backend response, including
 `position`, Project and Column references, reporter, nullable assignee,
-workflow/time fields, and the existing GitHub/deployment scalar fields.
+time fields, and the existing GitHub/deployment scalar fields. The legacy
+database status value is intentionally absent from the frontend contract.
 
 The frontend has no dedicated automated test runner. In addition to TypeScript,
 ESLint, formatting, production build, and PostgreSQL lifecycle coverage, the

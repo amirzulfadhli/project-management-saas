@@ -40,7 +40,7 @@ Successful committed mutations produce a compact `project:event` envelope:
 }
 ```
 
-The implemented event types cover Project update/archive, Project-member
+The implemented event types cover Project update/archive/restore, Project-member
 add/role-change/remove, Column create/rename/delete, Task
 create/update/move/delete, Comment create/update/delete, repository
 connect/disconnect, GitHub Issue link/unlink/sync/import, and attachment
@@ -86,7 +86,8 @@ Project-scoped TanStack Query keys:
 - Wiki page -> that user's Project Wiki list, affected page detail, and Activity
 - Time entry -> that user's active timer, affected Task time, and Project time
   summary
-- Project -> that Project detail
+- Project -> that Project detail plus the affected Organization's active and
+  archived Project-list variants when cached Project detail identifies it
 
 The originating browser may receive its own event. Realtime never inserts
 domain objects into cache; it only invalidates authoritative queries, so

@@ -75,7 +75,6 @@ export class TasksService {
             reporterId: userId,
             assigneeId: dto.assigneeId ?? null,
             priority: dto.priority ?? 1,
-            status: dto.status ?? 'todo',
             dueDate: dto.dueDate ?? null,
             estimatedTime: dto.estimatedTime ?? null,
             startDate: dto.startDate ?? null,
@@ -91,7 +90,6 @@ export class TasksService {
           metadata: {
             title: task.title,
             column: { id: task.column.id, name: task.column.name },
-            status: task.status,
             priority: task.priority,
             assignee: task.assignee
               ? { id: task.assignee.id, name: task.assignee.name }
@@ -140,7 +138,6 @@ export class TasksService {
     if (filter.columnId) where.columnId = filter.columnId;
     if (filter.assigneeId) where.assigneeId = filter.assigneeId;
     if (filter.priority !== undefined) where.priority = filter.priority;
-    if (filter.status) where.status = filter.status;
 
     return this.prisma.task.findMany({
       where,
@@ -199,7 +196,6 @@ export class TasksService {
               : { disconnect: true },
           }),
           ...(dto.priority !== undefined && { priority: dto.priority }),
-          ...(dto.status !== undefined && { status: dto.status }),
           ...(dto.dueDate !== undefined && { dueDate: dto.dueDate }),
           ...(dto.estimatedTime !== undefined && {
             estimatedTime: dto.estimatedTime,
@@ -294,7 +290,6 @@ export class TasksService {
             taskId: task.id,
             title: task.title,
             column: { id: task.column.id, name: task.column.name },
-            status: task.status,
             priority: task.priority,
             assignee: task.assignee
               ? { id: task.assignee.id, name: task.assignee.name }
@@ -503,14 +498,6 @@ export class TasksService {
           before: { id: before.column.id, name: before.column.name },
           after: { id: after.column.id, name: after.column.name },
         },
-      });
-    }
-    if (dto.status !== undefined && before.status !== after.status) {
-      await this.activities.record(tx, {
-        ...base,
-        type: ActivityEvent.TASK_STATUS_CHANGED,
-        description: `Changed status for Task "${after.title}"`,
-        metadata: { before: before.status, after: after.status },
       });
     }
     if (

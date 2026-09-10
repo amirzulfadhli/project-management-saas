@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const projectIdSchema = z.string().uuid();
+
 export const createProjectSchema = z.strictObject({
   name: z.string().trim().min(1, 'Name is required').max(120),
   description: z.string().max(5000).optional(),

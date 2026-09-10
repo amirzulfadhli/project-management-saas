@@ -4,12 +4,6 @@ const taskDateSchema = z
   .union([z.iso.date(), z.iso.datetime({ offset: true })])
   .transform((value) => new Date(value));
 
-const taskStatusSchema = z
-  .string()
-  .trim()
-  .min(1, 'Status cannot be empty')
-  .max(50);
-
 const userIdSchema = z.string().trim().min(1).max(128);
 
 export const taskIdSchema = z.string().uuid();
@@ -21,7 +15,6 @@ export const createTaskSchema = z.strictObject({
   columnId: z.string().uuid(),
   assigneeId: userIdSchema.optional(),
   priority: z.number().int().min(1).max(4).optional(),
-  status: taskStatusSchema.optional(),
   dueDate: taskDateSchema.optional(),
   estimatedTime: z.number().int().min(0).optional(),
   startDate: taskDateSchema.optional(),
@@ -35,7 +28,6 @@ export const updateTaskSchema = z.strictObject({
   columnId: z.string().uuid().optional(),
   assigneeId: userIdSchema.nullable().optional(),
   priority: z.number().int().min(1).max(4).optional(),
-  status: taskStatusSchema.optional(),
   dueDate: taskDateSchema.nullable().optional(),
   estimatedTime: z.number().int().min(0).nullable().optional(),
   actualTime: z.number().int().min(0).nullable().optional(),
@@ -57,7 +49,6 @@ export const listTasksQuerySchema = z.strictObject({
   columnId: z.string().uuid().optional(),
   assigneeId: userIdSchema.optional(),
   priority: z.coerce.number().int().min(1).max(4).optional(),
-  status: taskStatusSchema.optional(),
 });
 
 export type ListTasksQueryDto = z.infer<typeof listTasksQuerySchema>;

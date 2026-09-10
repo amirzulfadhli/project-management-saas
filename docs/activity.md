@@ -21,11 +21,11 @@ Prisma keeps `Activity.type` as `String`, while `activity.types.ts` provides the
 only application-level event constants:
 
 - Project: `PROJECT_CREATED`, `PROJECT_UPDATED`, `PROJECT_ARCHIVED`,
-  `PROJECT_DUPLICATED`
+  `PROJECT_RESTORED`, `PROJECT_DUPLICATED`
 - Membership: `PROJECT_MEMBER_ADDED`, `PROJECT_MEMBER_ROLE_CHANGED`,
   `PROJECT_MEMBER_REMOVED`
 - Task: `TASK_CREATED`, `TASK_RENAMED`, `TASK_UPDATED`, `TASK_MOVED`,
-  `TASK_STATUS_CHANGED`, `TASK_ASSIGNEE_CHANGED`,
+  historical `TASK_STATUS_CHANGED`, `TASK_ASSIGNEE_CHANGED`,
   `TASK_PRIORITY_CHANGED`, `TASK_DELETED`
 - Comment: `COMMENT_CREATED`, `COMMENT_UPDATED`, `COMMENT_DELETED`
 - Attachment: `ATTACHMENT_UPLOADED`, `ATTACHMENT_DELETED`
@@ -45,6 +45,11 @@ into Activity.
 Wiki events store only page identity/title, parent identity where useful, and
 changed-field names. They never copy Markdown bodies into Activity.
 
+Project archive, restore, and duplication are meaningful lifecycle events.
+Column definition changes remain realtime collaborative state but do not create
+Activity or Notifications; Task movement continues to provide the relevant
+semantic board history.
+
 ## Transaction guarantee
 
 `ActivitiesService.record` is an internal mutation helper. Domain services must
@@ -58,12 +63,13 @@ before-state. Task relationship and assignee checks use the same transaction
 client. Membership mutations reuse their existing Project-row lock.
 
 A Task PATCH compares only supplied fields against the stored result. Rename,
-Column movement, status, assignee, and priority changes receive specialized
-events. Other real field changes share one `TASK_UPDATED` event. A no-op PATCH
+Column movement, assignee, and priority changes receive specialized events.
+`TASK_STATUS_CHANGED` remains renderable for historical rows, but status is no
+longer writable. Other real field changes share one `TASK_UPDATED` event. A no-op PATCH
 creates no Activity; a multi-field PATCH may create several distinct events.
 
 For permanent Task deletion, the service records `TASK_DELETED` with the final
-title, Column, status, priority, and assignee, then deletes the Task in the same
+title, Column, priority, and assignee, then deletes the Task in the same
 transaction. PostgreSQL clears the Activity `taskId`, while `projectId` and
 metadata preserve useful history.
 

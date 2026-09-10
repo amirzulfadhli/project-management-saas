@@ -10,9 +10,11 @@ import { Badge } from "@/components/ui/badge";
 
 export function ProjectCard({
   project,
+  canAdminister,
   onNotice,
 }: {
   project: ProjectSummary;
+  canAdminister: boolean;
   onNotice?: (message: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -23,7 +25,7 @@ export function ProjectCard({
     onSuccess: async (copy) => {
       queryClient.setQueryData(queryKeys.project(copy.id), copy);
       await queryClient.invalidateQueries({
-        queryKey: queryKeys.projects(project.organizationId),
+        queryKey: queryKeys.organizationProjects(project.organizationId),
       });
       onNotice?.(`"${copy.name}" created.`);
     },
@@ -37,13 +39,24 @@ export function ProjectCard({
         (current) => current?.filter((item) => item.id !== project.id),
       );
       await queryClient.invalidateQueries({
-        queryKey: queryKeys.projects(project.organizationId),
+        queryKey: queryKeys.organizationProjects(project.organizationId),
       });
       onNotice?.(`"${project.name}" archived.`);
     },
   });
 
-  const actionError = duplicate.error ?? archive.error;
+  const restore = useMutation({
+    mutationFn: () => api.restoreProject(project.id),
+    onSuccess: async (restored) => {
+      queryClient.setQueryData(queryKeys.project(project.id), restored);
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.organizationProjects(project.organizationId),
+      });
+      onNotice?.(`"${project.name}" restored.`);
+    },
+  });
+
+  const actionError = duplicate.error ?? archive.error ?? restore.error;
 
   const handleArchive = () => {
     if (window.confirm(`Archive "${project.name}"?`)) {
@@ -77,26 +90,37 @@ export function ProjectCard({
         </div>
       </Link>
 
-      <div className="mt-3 flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => duplicate.mutate()}
-          disabled={duplicate.isPending}
-        >
-          {duplicate.isPending ? "Duplicating..." : "Duplicate"}
-        </Button>
-        {!archived ? (
+      {canAdminister ? (
+        <div className="mt-3 flex items-center gap-2">
           <Button
             variant="ghost"
             size="sm"
-            onClick={handleArchive}
-            disabled={archive.isPending}
+            onClick={() => duplicate.mutate()}
+            disabled={duplicate.isPending}
           >
-            {archive.isPending ? "Archiving..." : "Archive"}
+            {duplicate.isPending ? "Duplicating..." : "Duplicate"}
           </Button>
-        ) : null}
-      </div>
+          {!archived ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleArchive}
+              disabled={archive.isPending}
+            >
+              {archive.isPending ? "Archiving..." : "Archive"}
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => restore.mutate()}
+              disabled={restore.isPending}
+            >
+              {restore.isPending ? "Restoring..." : "Restore"}
+            </Button>
+          )}
+        </div>
+      ) : null}
 
       {actionError ? (
         <p className="mt-2 text-xs text-danger" role="alert">

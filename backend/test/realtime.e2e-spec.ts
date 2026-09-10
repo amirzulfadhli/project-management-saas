@@ -266,6 +266,20 @@ describe('Realtime collaboration (e2e)', () => {
       .send({ name: 'Realtime Project A updated' })
       .expect(200);
     await projectEvent;
+
+    const archivedEvent = waitForEvent(socket, 'PROJECT_ARCHIVED');
+    await request(baseUrl)
+      .delete(`/api/projects/${projectA.id}`)
+      .set('Cookie', ownerCookie)
+      .expect(204);
+    await archivedEvent;
+
+    const restoredEvent = waitForEvent(socket, 'PROJECT_RESTORED');
+    await request(baseUrl)
+      .post(`/api/projects/${projectA.id}/restore`)
+      .set('Cookie', ownerCookie)
+      .expect(200);
+    await restoredEvent;
   });
 
   it('converges two authorized clients viewing the same Project', async () => {

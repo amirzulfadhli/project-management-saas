@@ -77,7 +77,7 @@ runs those checks from clean installs.
 
 The repository root is this directory. From a clean clone, both applications
 use their committed `package-lock.json` files through `npm ci`; Prisma Client is
-generated rather than committed, and all sixteen production migrations remain in
+generated rather than committed, and all seventeen production migrations remain in
 source control. GitHub Actions uses only disposable CI configuration and a
 PostgreSQL service—no production or staging secrets are required.
 

@@ -19,6 +19,7 @@ import type { Task } from "./types";
 export const realtimeEventTypes = {
   PROJECT_UPDATED: "PROJECT_UPDATED",
   PROJECT_ARCHIVED: "PROJECT_ARCHIVED",
+  PROJECT_RESTORED: "PROJECT_RESTORED",
   PROJECT_MEMBER_ADDED: "PROJECT_MEMBER_ADDED",
   PROJECT_MEMBER_ROLE_CHANGED: "PROJECT_MEMBER_ROLE_CHANGED",
   PROJECT_MEMBER_REMOVED: "PROJECT_MEMBER_REMOVED",
@@ -172,10 +173,22 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
       switch (event.entity) {
         case "project":
-          void queryClient.invalidateQueries({
-            queryKey: queryKeys.project(event.projectId),
-            exact: true,
-          });
+          {
+            const cachedProject = queryClient.getQueryData<{
+              organizationId: string;
+            }>(queryKeys.project(event.projectId));
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.project(event.projectId),
+              exact: true,
+            });
+            if (cachedProject) {
+              void queryClient.invalidateQueries({
+                queryKey: queryKeys.organizationProjects(
+                  cachedProject.organizationId,
+                ),
+              });
+            }
+          }
           break;
         case "project-member":
           void Promise.all([

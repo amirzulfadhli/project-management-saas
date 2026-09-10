@@ -211,8 +211,13 @@ export const api = {
     ),
 
   // Projects
-  getProjects: (organizationId: string) =>
-    request<ProjectSummary[]>(withQuery("/api/projects", { organizationId })),
+  getProjects: (organizationId: string, archived = false) =>
+    request<ProjectSummary[]>(
+      withQuery("/api/projects", {
+        organizationId,
+        ...(archived ? { archived: true } : {}),
+      }),
+    ),
   createProject: (input: CreateProjectInput) =>
     request<ProjectDetail>("/api/projects", {
       method: "POST",
@@ -226,6 +231,8 @@ export const api = {
     }),
   archiveProject: (id: string) =>
     request<void>(`/api/projects/${id}`, { method: "DELETE" }),
+  restoreProject: (id: string) =>
+    request<ProjectDetail>(`/api/projects/${id}/restore`, { method: "POST" }),
   duplicateProject: (id: string) =>
     request<ProjectDetail>(`/api/projects/${id}/duplicate`, {
       method: "POST",

@@ -46,7 +46,7 @@ export class ProjectColumnsService {
 
   async create(userId: string, projectId: string, dto: CreateProjectColumnDto) {
     return this.prisma.$transaction(async (tx) => {
-      await this.access.assertProjectAccess(userId, projectId, tx);
+      await this.access.assertProjectOwnerAuthority(userId, projectId, tx);
       const boards = await tx.$queryRaw<Array<{ id: string }>>(
         Prisma.sql`SELECT "id" FROM "Board" WHERE "projectId" = ${projectId} FOR UPDATE`,
       );
@@ -126,7 +126,7 @@ export class ProjectColumnsService {
     operation: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
     return this.prisma.$transaction(async (tx) => {
-      await this.access.assertProjectAccess(userId, projectId, tx);
+      await this.access.assertProjectOwnerAuthority(userId, projectId, tx);
       const columns = await tx.$queryRaw<Array<{ id: string }>>(
         Prisma.sql`
           SELECT c."id"

@@ -19,9 +19,10 @@ a replacement Board. There is no public Board CRUD API.
 
 ## Project-nested Column API
 
-All routes require a Better Auth session and the repository's existing broad
-Project access: Organization ownership, Organization membership, or explicit
-Project membership.
+All routes require a Better Auth session. GET uses normal Project access:
+Organization ownership/membership or explicit Project membership. POST,
+PATCH, and DELETE are structural administration and require Organization
+`OWNER` or explicit Project `OWNER`.
 
     GET    /api/projects/:projectId/columns
     POST   /api/projects/:projectId/columns
@@ -45,7 +46,7 @@ cascade-deleted, or silently changed.
 Supported requests follow this chain:
 
     Better Auth session
-      -> Project access
+      -> Project access for reads / Project owner authority for mutations
       -> Project's unique Board
       -> Column with matching projectId and boardId
       -> Prisma/PostgreSQL
@@ -70,8 +71,8 @@ using malformed relationships.
 ## Column ordering and concurrency
 
 The existing unique constraint `(projectId, position)` remains authoritative.
-To append, the service starts a Prisma transaction, checks Project access with
-that transaction client, locks the Project's Board row with PostgreSQL
+To append, the service starts a Prisma transaction, checks Project owner
+authority with that transaction client, locks the Project's Board row with PostgreSQL
 `FOR UPDATE`, reads the highest position in the Project, and inserts at the next
 integer. Concurrent supported appends therefore serialize and receive unique,
 increasing positions. An unexpected database uniqueness race is translated to
@@ -89,7 +90,8 @@ the current access path.
 
 ## Frontend Column management
 
-The Project detail header exposes a compact **Columns** management dialog. It
+The Project detail header exposes a compact **Columns** management dialog only
+to users with owner-level administration authority. It
 uses the Project-nested API to list the current Board's Columns, add a new
 Column, rename an existing Column, and permanently delete an empty Column. The
 form sends only a trimmed `name` (maximum 120 characters); relationship IDs and
@@ -109,7 +111,8 @@ confirmation and clearly states that only empty Columns can be deleted. An HTTP
 409 leaves the Column and every Task visible and explains that Tasks must be
 moved or permanently deleted first. HTTP 401, 403, and 404 states are also
 translated into concise UI feedback; server authorization and relationship
-validation remain authoritative.
+validation remain authoritative. Ordinary collaborators still move Tasks
+between existing Columns through the separate Task movement contract.
 
 The dialog has labeled controls, disabled mutation states, an ordered roster,
 loading/empty/error states, and inline success/error feedback. It exposes no

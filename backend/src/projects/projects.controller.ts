@@ -20,6 +20,7 @@ import {
   CreateProjectDto,
   listProjectsQuerySchema,
   ListProjectsQueryDto,
+  projectIdSchema,
   updateProjectSchema,
   UpdateProjectDto,
 } from './dto/project.dto';
@@ -46,8 +47,28 @@ export class ProjectsController {
 
   @Post(':id/duplicate')
   @HttpCode(HttpStatus.CREATED)
-  duplicate(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  duplicate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(projectIdSchema)) id: string,
+  ) {
     return this.projectsService.duplicate(user.id, id);
+  }
+
+  @Post(':id/restore')
+  @HttpCode(HttpStatus.OK)
+  async restore(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(projectIdSchema)) id: string,
+  ) {
+    const project = await this.projectsService.restore(user.id, id);
+    await this.realtime.publish({
+      projectId: id,
+      type: RealtimeEventType.PROJECT_RESTORED,
+      entity: 'project',
+      entityId: id,
+      actorId: user.id,
+    });
+    return project;
   }
 
   @Get()
@@ -64,14 +85,17 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  findOne(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ZodValidationPipe(projectIdSchema)) id: string,
+  ) {
     return this.projectsService.findOne(user.id, id);
   }
 
   @Patch(':id')
   async update(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', new ZodValidationPipe(projectIdSchema)) id: string,
     @Body(new ZodValidationPipe(updateProjectSchema)) dto: UpdateProjectDto,
   ) {
     const project = await this.projectsService.update(user.id, id, dto);
@@ -89,7 +113,7 @@ export class ProjectsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async archive(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
+    @Param('id', new ZodValidationPipe(projectIdSchema)) id: string,
   ) {
     await this.projectsService.archive(user.id, id);
     await this.realtime.publish({

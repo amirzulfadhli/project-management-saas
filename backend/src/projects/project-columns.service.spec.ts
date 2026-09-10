@@ -23,7 +23,10 @@ describe('ProjectColumnsService', () => {
   let prisma: PrismaService;
   let boardFindUnique: jest.Mock;
   let columnFindMany: jest.Mock;
-  let access: { assertProjectAccess: jest.Mock };
+  let access: {
+    assertProjectAccess: jest.Mock;
+    assertProjectOwnerAuthority: jest.Mock;
+  };
   let service: ProjectColumnsService;
 
   beforeEach(() => {
@@ -49,7 +52,10 @@ describe('ProjectColumnsService', () => {
       board: { findUnique: boardFindUnique },
       column: { findMany: columnFindMany },
     } as unknown as PrismaService;
-    access = { assertProjectAccess: jest.fn() };
+    access = {
+      assertProjectAccess: jest.fn(),
+      assertProjectOwnerAuthority: jest.fn(),
+    };
     service = new ProjectColumnsService(
       prisma,
       access as unknown as AccessService,
@@ -80,7 +86,7 @@ describe('ProjectColumnsService', () => {
   it('locks the Board and appends after the highest Project position', async () => {
     await service.create(userId, projectId, { name: 'Blocked' });
 
-    expect(access.assertProjectAccess).toHaveBeenCalledWith(
+    expect(access.assertProjectOwnerAuthority).toHaveBeenCalledWith(
       userId,
       projectId,
       transaction,
@@ -114,6 +120,11 @@ describe('ProjectColumnsService', () => {
     await service.update(userId, projectId, columnId, { name: 'Ready' });
 
     expect(transaction.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(access.assertProjectOwnerAuthority).toHaveBeenCalledWith(
+      userId,
+      projectId,
+      transaction,
+    );
     expect(transaction.column.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: columnId },
@@ -146,5 +157,10 @@ describe('ProjectColumnsService', () => {
     expect(transaction.column.delete).toHaveBeenCalledWith({
       where: { id: columnId },
     });
+    expect(access.assertProjectOwnerAuthority).toHaveBeenCalledWith(
+      userId,
+      projectId,
+      transaction,
+    );
   });
 });

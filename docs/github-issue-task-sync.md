@@ -56,8 +56,11 @@ The `Issue` link record enforces:
 - at most one link per Task;
 - one external Issue ID per connected repository;
 - one Issue number per connected repository;
-- an authoritative Repository and Project relationship for all new writes.
+- an authoritative Repository and Project relationship at the database
+  boundary through a composite foreign key.
 
+`projectId` and `externalIssueId` are required after a fail-safe compatibility
+check verifies every legacy row was backfilled and matches its Repository.
 Project-row locking serializes link/import operations. Database unique
 constraints provide the final concurrent duplicate guard and conflicts return
 HTTP 409.

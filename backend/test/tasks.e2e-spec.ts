@@ -22,7 +22,6 @@ interface TaskResponse {
   assigneeId: string | null;
   reporterId: string;
   priority: number;
-  status: string;
   position: number;
   dueDate: string | null;
   column: { id: string; name: string; position: number };
@@ -213,7 +212,6 @@ describe('Task core lifecycle (e2e)', () => {
       assigneeId: ownerId,
       reporterId: ownerId,
       priority: 3,
-      status: 'todo',
       project: { id: projectA.id },
       column: { id: projectA.board.columns[0].id },
       assignee: { id: ownerId, email: ownerEmail },
@@ -261,6 +259,15 @@ describe('Task core lifecycle (e2e)', () => {
         projectId: projectA.id,
         columnId: projectA.board.columns[0].id,
         unexpected: true,
+      })
+      .expect(400);
+    await ownerClient
+      .post('/api/tasks')
+      .send({
+        title: 'Conflicting workflow state',
+        projectId: projectA.id,
+        columnId: projectA.board.columns[0].id,
+        status: 'done',
       })
       .expect(400);
     await ownerClient.get('/api/tasks/not-a-uuid').expect(400);
@@ -320,7 +327,6 @@ describe('Task core lifecycle (e2e)', () => {
         title: '  Moved Task  ',
         columnId: destinationColumn.id,
         priority: 4,
-        status: 'in_progress',
         dueDate: '2026-10-01T12:30:00.000Z',
       })
       .expect(200);
@@ -332,7 +338,6 @@ describe('Task core lifecycle (e2e)', () => {
       projectId: projectA.id,
       columnId: destinationColumn.id,
       priority: 4,
-      status: 'in_progress',
       column: { id: destinationColumn.id },
       project: { id: projectA.id },
     });
@@ -345,6 +350,16 @@ describe('Task core lifecycle (e2e)', () => {
       .expect(({ body }) => {
         expect((body as TaskResponse).columnId).toBe(destinationColumn.id);
       });
+    await ownerClient
+      .patch('/api/tasks/' + task.id)
+      .send({ status: 'done' })
+      .expect(400);
+    expect(
+      await prisma.task.findUnique({
+        where: { id: task.id },
+        select: { columnId: true, status: true },
+      }),
+    ).toEqual({ columnId: destinationColumn.id, status: 'todo' });
   });
 
   it('rejects a move to another Project without changing the Task', async () => {

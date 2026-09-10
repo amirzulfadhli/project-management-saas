@@ -1,17 +1,17 @@
 # FlowPlan repository status
 
-Last verified: 2026-09-10
+Last verified: 2026-09-11
 
 ## Release checkpoint
 
 Organization Administration + RBAC, Files & Attachments, Project Wiki, and
 Time Tracking are complete for development and automated verification.
-The latest verified baseline is 157 backend unit tests, 103 PostgreSQL E2E
-tests, 16 current migrations with no schema drift, and passing frontend
+The latest verified baseline is 158 backend unit tests, 105 PostgreSQL E2E
+tests, 17 current migrations with no schema drift, and passing frontend
 TypeScript, ESLint, and production build checks.
 
 Consolidated browser QA remains deferred for Realtime, Notifications,
-Organization administration, Files, Wiki, and Time Tracking. Live GitHub App
+Organization/Project administration, Files, Wiki, and Time Tracking. Live GitHub App
 verification is blocked on public HTTPS. Coolify staging deployment is paused
 until the external VPS/domain prerequisites are available. These external
 and manual acceptance gates are not claimed complete.
@@ -45,12 +45,12 @@ FlowPlan now has an independent repository boundary at this directory rather
 than relying on the unrelated Git repository in the developer's home folder.
 Local environments, generated Prisma Client code, dependencies, build output,
 logs, caches, and local database files are ignored; environment examples,
-package lockfiles, the Prisma schema, and all sixteen migrations remain repository
-inputs. GitHub Actions performs clean frontend/backend installs and builds plus
+package lockfiles, the Prisma schema, and all seventeen migrations remain
+repository inputs. GitHub Actions performs clean frontend/backend installs and builds plus
 backend unit and PostgreSQL-backed E2E verification using disposable CI-only
 configuration. Local clean-checkout verification passed from both lockfiles,
-and the first GitHub-hosted CI run passed. The current GitHub App changes remain
-subject to the normal push/hosted-CI gate before staging.
+and the first GitHub-hosted CI run passed. Each checkpoint remains subject to
+the normal push/hosted-CI gate before staging.
 
 ## ✅ Working
 
@@ -380,6 +380,50 @@ Focused GitHub E2E passes 12/12, the complete PostgreSQL regression passes
 schemas have no drift, and frontend TypeScript, ESLint, formatting, and
 production build pass. Live Issue synchronization remains blocked on public
 HTTPS and live GitHub App credentials; no live result is claimed.
+
+## V1 workflow correctness and authorization closure
+
+V1 Workflow Correctness + Authorization Closure is **COMPLETE**. Project
+metadata updates, archive, restore, duplication, and structural Column
+mutations now require either Organization `OWNER` or explicit Project `OWNER`
+authority. Ordinary inherited/explicit collaborators retain normal read and
+Task collaboration access, including Task movement between owner-managed
+Columns. Backend checks remain authoritative, while the frontend hides only
+the administrative controls the current user cannot use.
+
+Active and archived Project lists have distinct Organization-scoped query
+keys. The Projects surface intentionally switches between the two views, and
+restore preserves the original Project, Board, Columns, Tasks, membership, and
+history. `PROJECT_RESTORED` is recorded atomically and published through the
+existing compact post-commit realtime channel. Project-list invalidation is
+limited to the cached Project's Organization.
+
+Archive, restore, and duplication retain compact Project Activity. Structural
+Column changes continue to publish cache invalidation but intentionally do not
+add Activity noise. None of these administration actions creates a private
+Notification.
+
+Duplication remains conservative: basic Project metadata, optional Team,
+Board name, and ordered Column names are copied into a new active Project with
+the duplicator as its only explicit owner. Tasks, Comments, prior Activity,
+Notifications, Files, Wiki pages, Time entries, memberships, repository/Issue
+links, webhook deliveries, and other external identities are not copied.
+
+Board Column/position is now the only writable Task workflow state. The
+legacy `Task.status` database column is preserved non-destructively but removed
+from create/update/list DTOs, filters, frontend types, and new Activity writes.
+Historical status Activity remains renderable. The seventeenth additive
+migration also makes GitHub Issue external/Project identity required and adds
+a composite Repository/Project foreign key, after fail-safe checks for legacy
+null or mismatched rows.
+
+Focused Project/Column/Task/Activity/GitHub E2E passes 45/45 and focused
+Activity/realtime E2E passes 13/13. The complete backend unit suite passes
+158/158 across 27 suites, and the complete PostgreSQL regression passes
+105/105 across 16 suites. All seventeen migrations deploy from zero;
+development and fresh schemas have no drift. Backend/frontend TypeScript,
+ESLint, formatting, and production builds pass. Manual consolidated browser
+QA, deployment/backups, and live GitHub verification remain separate gates.
 
 ## Realtime collaboration core milestone
 

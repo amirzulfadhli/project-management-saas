@@ -119,7 +119,7 @@ model Project {
   tasks                   Task[]
   wikiPages               WikiPage[]              @relation("WikiPageProject")
   notifications           Notification[]          @relation("NotificationProject")
-  timeEntries             TimeEntry[]              @relation("TimeEntryProject")
+  timeEntries             TimeEntry[]             @relation("TimeEntryProject")
 
   @@index([organizationId, archivedAt])
 }
@@ -323,6 +323,7 @@ model Repository {
   githubInstallation   GithubInstallation?     @relation(fields: [githubInstallationId], references: [id], onDelete: Restrict)
 
   @@unique([provider, externalRepositoryId])
+  @@unique([id, projectId])
   @@index([githubInstallationId])
 }
 
@@ -379,8 +380,8 @@ model Issue {
   body            String?
   state           String
   url             String
-  externalIssueId String?
-  projectId       String?
+  externalIssueId String
+  projectId       String
   repositoryId    String
   taskId          String?
   createdAt       DateTime   @default(now())
@@ -388,8 +389,8 @@ model Issue {
   lastSyncedAt    DateTime   @default(now())
   unavailableAt   DateTime?
   closedAt        DateTime?
-  project         Project?   @relation("IssueProject", fields: [projectId], references: [id], onDelete: Restrict)
-  repository      Repository @relation(fields: [repositoryId], references: [id])
+  project         Project    @relation("IssueProject", fields: [projectId], references: [id], onDelete: Restrict)
+  repository      Repository @relation(fields: [repositoryId, projectId], references: [id, projectId], onDelete: Restrict)
   task            Task?      @relation(fields: [taskId], references: [id])
 
   @@unique([taskId])

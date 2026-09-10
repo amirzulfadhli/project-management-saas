@@ -239,7 +239,7 @@ describe('Activity core backend (e2e)', () => {
       .expect(400);
   });
 
-  it('records Project create, real update, archive, and duplicate events', async () => {
+  it('records Project create, real update, archive, restore, and duplicate events', async () => {
     expect(
       (await feed(projectA.id)).some(
         (item) => item.type === ActivityEvent.PROJECT_CREATED,
@@ -254,6 +254,7 @@ describe('Activity core backend (e2e)', () => {
       .send({ name: 'Activity A Renamed' })
       .expect(200);
     await ownerClient.delete(`/api/projects/${projectA.id}`).expect(204);
+    await ownerClient.post(`/api/projects/${projectA.id}/restore`).expect(200);
     const duplicate = await ownerClient
       .post(`/api/projects/${projectA.id}/duplicate`)
       .expect(201);
@@ -263,6 +264,7 @@ describe('Activity core backend (e2e)', () => {
       types.filter((type) => type === ActivityEvent.PROJECT_UPDATED),
     ).toHaveLength(1);
     expect(types).toContain(ActivityEvent.PROJECT_ARCHIVED);
+    expect(types).toContain(ActivityEvent.PROJECT_RESTORED);
     expect((await feed(duplicateId)).map((item) => item.type)).toContain(
       ActivityEvent.PROJECT_DUPLICATED,
     );
@@ -284,7 +286,6 @@ describe('Activity core backend (e2e)', () => {
       .send({
         title: 'Renamed Task',
         columnId: projectA.board.columns[1].id,
-        status: 'in_progress',
         assigneeId: null,
         priority: 3,
         description: 'Changed',
@@ -315,7 +316,6 @@ describe('Activity core backend (e2e)', () => {
       ActivityEvent.TASK_CREATED,
       ActivityEvent.TASK_RENAMED,
       ActivityEvent.TASK_MOVED,
-      ActivityEvent.TASK_STATUS_CHANGED,
       ActivityEvent.TASK_ASSIGNEE_CHANGED,
       ActivityEvent.TASK_PRIORITY_CHANGED,
       ActivityEvent.TASK_UPDATED,

@@ -670,6 +670,29 @@ describe('GitHub integration core backend (e2e)', () => {
     ).toBe(notificationCount);
   });
 
+  it('enforces the Repository and Project Issue scope at the database boundary', async () => {
+    const repository = await prisma.repository.findUniqueOrThrow({
+      where: { projectId: projectA.id },
+    });
+    const issueId = randomUUID();
+
+    await expect(
+      prisma.$executeRaw`
+        INSERT INTO "Issue" (
+          "id", "number", "title", "state", "url", "externalIssueId",
+          "projectId", "repositoryId", "createdAt", "updatedAt", "lastSyncedAt"
+        ) VALUES (
+          ${issueId}, 99999, 'Mismatched Project', 'open',
+          'https://github.com/flowplan-tests/project-alpha/issues/99999',
+          '99999999', ${projectB.id}, ${repository.id}, NOW(), NOW(), NOW()
+        )
+      `,
+    ).rejects.toBeDefined();
+    expect(
+      await prisma.issue.findUnique({ where: { id: issueId } }),
+    ).toBeNull();
+  });
+
   it('allows owner disconnect, preserves replay protection, and leaves a user-attributed Activity event', async () => {
     const repository = await prisma.repository.findUniqueOrThrow({
       where: { projectId: projectA.id },

@@ -177,7 +177,7 @@ describe('Project Column core lifecycle (e2e)', () => {
     return response.body as ColumnResponse;
   }
 
-  it('requires authentication and preserves broad Project collaborator access', async () => {
+  it('allows collaborators to read and move Tasks but reserves Column structure for owners', async () => {
     const unauthenticated = request(app.getHttpServer());
     await unauthenticated
       .get(`/api/projects/${projectA.id}/columns`)
@@ -188,7 +188,32 @@ describe('Project Column core lifecycle (e2e)', () => {
       .expect(401);
 
     await memberClient.get(`/api/projects/${projectA.id}/columns`).expect(200);
-    await createColumn(projectA, 'Member-created', memberClient);
+    await memberClient
+      .post(`/api/projects/${projectA.id}/columns`)
+      .send({ name: 'Member-created' })
+      .expect(403);
+    const ownerColumn = await createColumn(projectA, 'Owner-managed');
+    await memberClient
+      .patch(`/api/projects/${projectA.id}/columns/${ownerColumn.id}`)
+      .send({ name: 'Member rename' })
+      .expect(403);
+    await memberClient
+      .delete(`/api/projects/${projectA.id}/columns/${ownerColumn.id}`)
+      .expect(403);
+
+    const taskResponse = await memberClient
+      .post('/api/tasks')
+      .send({
+        title: 'Collaborator movement',
+        projectId: projectA.id,
+        columnId: projectA.board.columns[0].id,
+      })
+      .expect(201);
+    const taskId = (taskResponse.body as { id: string }).id;
+    await memberClient
+      .patch(`/api/tasks/${taskId}/move`)
+      .send({ columnId: projectA.board.columns[1].id, targetIndex: 0 })
+      .expect(200);
     await outsiderClient
       .get(`/api/projects/${projectA.id}/columns`)
       .expect(403);

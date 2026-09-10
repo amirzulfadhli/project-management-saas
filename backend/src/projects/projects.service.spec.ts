@@ -33,7 +33,7 @@ interface ProjectFindManyArgs {
 interface ProjectUpdateArgs {
   data: {
     name?: string;
-    archivedAt?: Date;
+    archivedAt?: Date | null;
   };
   include?: {
     organization?: boolean;
@@ -82,6 +82,13 @@ describe('ProjectsService', () => {
     assertProjectAccess: jest.MockedFunction<
       (userId: string, projectId: string) => Promise<void>
     >;
+    assertProjectOwnerAuthority: jest.MockedFunction<
+      (
+        userId: string,
+        projectId: string,
+        transaction?: unknown,
+      ) => Promise<void>
+    >;
   };
 
   beforeEach(() => {
@@ -106,6 +113,7 @@ describe('ProjectsService', () => {
     access = {
       assertOrganizationMember: jest.fn(),
       assertProjectAccess: jest.fn(),
+      assertProjectOwnerAuthority: jest.fn(),
     };
     service = new ProjectsService(
       prisma as unknown as PrismaService,
@@ -177,7 +185,7 @@ describe('ProjectsService', () => {
     expect(archivedCall?.where.archivedAt).toEqual({ not: null });
   });
 
-  it('enforces project access on update and archive', async () => {
+  it('enforces owner authority on update and archive', async () => {
     tx.project.findUniqueOrThrow
       .mockResolvedValueOnce({
         id: 'p1',
@@ -206,7 +214,13 @@ describe('ProjectsService', () => {
     await service.update('u1', 'p1', { name: 'Renamed' });
     await service.archive('u1', 'p1');
 
-    expect(access.assertProjectAccess).toHaveBeenCalledTimes(2);
+    expect(access.assertProjectOwnerAuthority).toHaveBeenCalledTimes(2);
+    expect(access.assertProjectOwnerAuthority).toHaveBeenNthCalledWith(
+      1,
+      'u1',
+      'p1',
+      tx,
+    );
 
     const updateCalls = tx.project.update.mock.calls as unknown as Array<
       [ProjectUpdateArgs]
@@ -218,5 +232,34 @@ describe('ProjectsService', () => {
 
     const archiveCall = updateCalls[1]?.[0];
     expect(archiveCall?.data.archivedAt).toBeInstanceOf(Date);
+  });
+
+  it('restores an archived Project and records the transition', async () => {
+    const archivedAt = new Date('2026-09-10T12:00:00.000Z');
+    tx.project.findUniqueOrThrow.mockResolvedValue({
+      id: 'p1',
+      name: 'Restored',
+      archivedAt,
+    });
+    tx.project.update.mockResolvedValue({
+      id: 'p1',
+      name: 'Restored',
+      archivedAt: null,
+    });
+
+    const result = await service.restore('u1', 'p1');
+
+    expect(access.assertProjectOwnerAuthority).toHaveBeenCalledWith(
+      'u1',
+      'p1',
+      tx,
+    );
+    expect(tx.project.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'p1' },
+        data: { archivedAt: null },
+      }),
+    );
+    expect(result).toMatchObject({ id: 'p1', archivedAt: null });
   });
 });
