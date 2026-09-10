@@ -6,8 +6,8 @@ Last verified: 2026-09-10
 
 Organization Administration + RBAC, Files & Attachments, Project Wiki, and
 Time Tracking are complete for development and automated verification.
-The latest verified baseline is 148 backend unit tests, 101 PostgreSQL E2E
-tests, 15 current migrations with no schema drift, and passing frontend
+The latest verified baseline is 157 backend unit tests, 103 PostgreSQL E2E
+tests, 16 current migrations with no schema drift, and passing frontend
 TypeScript, ESLint, and production build checks.
 
 Consolidated browser QA remains deferred for Realtime, Notifications,
@@ -45,7 +45,7 @@ FlowPlan now has an independent repository boundary at this directory rather
 than relying on the unrelated Git repository in the developer's home folder.
 Local environments, generated Prisma Client code, dependencies, build output,
 logs, caches, and local database files are ignored; environment examples,
-package lockfiles, the Prisma schema, and all fifteen migrations remain repository
+package lockfiles, the Prisma schema, and all sixteen migrations remain repository
 inputs. GitHub Actions performs clean frontend/backend installs and builds plus
 backend unit and PostgreSQL-backed E2E verification using disposable CI-only
 configuration. Local clean-checkout verification passed from both lockfiles,
@@ -167,7 +167,7 @@ subject to the normal push/hosted-CI gate before staging.
 
 - Team UI/API and most collaboration features.
 - Calendar and timeline workflows.
-- Live GitHub App verification and issue/Task synchronization.
+- Live GitHub App and Issue-sync verification.
 - Column reordering; Task ordering and single-instance realtime board
   reconciliation are implemented.
 - Redis-backed multi-instance Socket.IO, BullMQ, AI features, and production
@@ -315,7 +315,7 @@ raw body, mapped by stable external repository ID, normalized without raw
 payload storage, and made idempotent by GitHub delivery ID. Repository
 connect/disconnect produces user-attributed Activity; webhook Activity waits for
 an honest external/system-actor model. Live GitHub App credentials, discovery,
-webhook registration, and issue/Task sync remain separate milestones.
+webhook registration, and Issue/Task sync were separate follow-up milestones.
 
 GitHub Integration Core Backend Foundation is PostgreSQL-verified. The focused
 GitHub suite passes 8/8 tests, the complete backend E2E suite passes 65/65 tests
@@ -355,6 +355,31 @@ Organization owners or explicit Project `OWNER`s receive mutation controls.
 TypeScript, ESLint, Prettier, and the Next production build are verified. Live
 installation and callback behavior remain pending because a configured GitHub
 App and public HTTPS backend are unavailable; no live success is claimed.
+
+## GitHub Issue and Task synchronization milestone
+
+GitHub Issue ↔ FlowPlan Task Sync Core is **COMPLETE LOCALLY**. Collaborators
+can page through Issues from the Project's verified connected repository, link
+an existing Task, or explicitly create an ordered Task in a selected Column.
+The server accepts no repository metadata from the browser: installation,
+owner, repository, URL, and Issue identity are derived through a transient
+installation token and the stored verified connection.
+
+The sixteenth additive migration upgrades the unused legacy `Issue` scaffold
+without discarding data and enforces one Issue per Task plus repository-scoped
+external-ID and number uniqueness. Project-row serialization and database
+constraints protect concurrent link/import requests. Signed, idempotent Issue
+webhooks update linked Task title/description and GitHub state without moving
+Columns; unavailable events preserve the Task, and unlinking stops future
+synchronization. FlowPlan-to-GitHub writes, automatic imports, assignee
+mapping, and PR sync remain intentionally deferred.
+
+Focused GitHub E2E passes 12/12, the complete PostgreSQL regression passes
+103/103 across 16 suites, and the full backend unit suite passes 157/157 across
+27 suites. All sixteen migrations deploy from zero, development and fresh
+schemas have no drift, and frontend TypeScript, ESLint, formatting, and
+production build pass. Live Issue synchronization remains blocked on public
+HTTPS and live GitHub App credentials; no live result is claimed.
 
 ## Realtime collaboration core milestone
 

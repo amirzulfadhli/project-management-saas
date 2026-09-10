@@ -34,6 +34,10 @@ export const realtimeEventTypes = {
   COMMENT_DELETED: "COMMENT_DELETED",
   REPOSITORY_CONNECTED: "REPOSITORY_CONNECTED",
   REPOSITORY_DISCONNECTED: "REPOSITORY_DISCONNECTED",
+  GITHUB_ISSUE_LINKED: "GITHUB_ISSUE_LINKED",
+  GITHUB_ISSUE_UNLINKED: "GITHUB_ISSUE_UNLINKED",
+  GITHUB_ISSUE_SYNCED: "GITHUB_ISSUE_SYNCED",
+  TASK_CREATED_FROM_GITHUB_ISSUE: "TASK_CREATED_FROM_GITHUB_ISSUE",
   ATTACHMENT_CREATED: "ATTACHMENT_CREATED",
   ATTACHMENT_DELETED: "ATTACHMENT_DELETED",
   WIKI_PAGE_CREATED: "WIKI_PAGE_CREATED",
@@ -56,11 +60,12 @@ export interface RealtimeEventEnvelope {
     | "task"
     | "comment"
     | "repository"
+    | "github-issue"
     | "attachment"
     | "wiki-page"
     | "time-entry";
   entityId: string;
-  actorId: string;
+  actorId: string | null;
   taskId?: string;
   occurredAt: string;
 }
@@ -250,6 +255,34 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
             queryClient.invalidateQueries({
               queryKey: queryKeys.projectRepository(event.projectId),
               exact: true,
+            }),
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.projectActivities(event.projectId),
+              exact: true,
+            }),
+          ]);
+          break;
+        case "github-issue":
+          void Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.githubIssueLists(
+                event.projectId,
+                sessionUserId,
+              ),
+            }),
+            ...(event.taskId
+              ? [
+                  queryClient.invalidateQueries({
+                    queryKey: queryKeys.taskGithubIssue(
+                      event.taskId,
+                      sessionUserId,
+                    ),
+                    exact: true,
+                  }),
+                ]
+              : []),
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.tasks(event.projectId),
             }),
             queryClient.invalidateQueries({
               queryKey: queryKeys.projectActivities(event.projectId),

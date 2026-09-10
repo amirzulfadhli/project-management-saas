@@ -44,3 +44,28 @@ export const githubRepositoryQuerySchema = z.strictObject({
 export type GithubRepositoryQueryDto = z.infer<
   typeof githubRepositoryQuerySchema
 >;
+
+export const githubIssueNumberSchema = z.coerce
+  .number()
+  .int()
+  .min(1)
+  .max(2_147_483_647);
+
+export const githubIssueQuerySchema = z.strictObject({
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(100).default(30),
+  state: z.enum(['open', 'closed', 'all']).default('open'),
+});
+export type GithubIssueQueryDto = z.infer<typeof githubIssueQuerySchema>;
+
+export const linkGithubIssueSchema = z.strictObject({
+  issueNumber: githubIssueNumberSchema,
+});
+export type LinkGithubIssueDto = z.infer<typeof linkGithubIssueSchema>;
+
+export const createTaskFromGithubIssueSchema = z.strictObject({
+  columnId: z.string().uuid(),
+});
+export type CreateTaskFromGithubIssueDto = z.infer<
+  typeof createTaskFromGithubIssueSchema
+>;

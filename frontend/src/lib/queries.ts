@@ -26,6 +26,21 @@ export const queryKeys = {
     ["github-repositories", { installationId, page, perPage }] as const,
   projectRepository: (projectId: string) =>
     ["project-repository", { projectId }] as const,
+  githubIssueLists: (projectId: string, userId: string | null = null) =>
+    ["github-issues", { projectId, userId }] as const,
+  githubIssues: (
+    projectId: string,
+    page: number,
+    perPage: number,
+    state: "open" | "closed" | "all",
+    userId: string | null = null,
+  ) =>
+    [
+      ...queryKeys.githubIssueLists(projectId, userId),
+      { page, perPage, state },
+    ] as const,
+  taskGithubIssue: (taskId: string, userId: string | null = null) =>
+    ["task-github-issue", { taskId, userId }] as const,
   taskLists: ["tasks"] as const,
   tasks: (projectId: string, filters: TaskFilters = {}) =>
     ["tasks", { projectId, ...filters }] as const,

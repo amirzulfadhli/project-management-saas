@@ -50,6 +50,19 @@ const repositoryPageSchema = z.object({
   repositories: z.array(repositorySchema),
 });
 
+const issueSchema = z.object({
+  id: z.union([z.number().int().positive(), z.string().regex(/^[1-9]\d*$/)]),
+  number: z.number().int().positive(),
+  title: z.string().min(1).max(1000),
+  body: z.string().max(250_000).nullable(),
+  state: z.enum(['open', 'closed']),
+  html_url: z.string().url().startsWith('https://github.com/'),
+  updated_at: z.string().datetime(),
+  pull_request: z.unknown().optional(),
+});
+
+const issuePageSchema = z.array(issueSchema);
+
 const installationTokenSchema = z.object({
   token: z.string().min(1),
   expires_at: z.string().datetime(),
@@ -77,6 +90,16 @@ export interface GithubRepositoryIdentity {
   htmlUrl: string;
   private: boolean;
   archived: boolean;
+}
+
+export interface GithubIssueIdentity {
+  externalIssueId: string;
+  number: number;
+  title: string;
+  body: string | null;
+  state: 'open' | 'closed';
+  htmlUrl: string;
+  updatedAt: string;
 }
 
 @Injectable()
@@ -244,6 +267,54 @@ export class GithubAppClient {
     return this.normalizeRepository(repository);
   }
 
+  async listIssues(
+    installationId: string,
+    owner: string,
+    repository: string,
+    page: number,
+    perPage: number,
+    state: 'open' | 'closed' | 'all',
+  ) {
+    const token = await this.createInstallationToken(installationId);
+    const path = this.repositoryPath(owner, repository);
+    const value = await this.requestJson(
+      `${GITHUB_API_URL}${path}/issues?page=${page}&per_page=${perPage}&state=${state}&sort=updated&direction=desc`,
+      { headers: this.githubHeaders(token) },
+    );
+    const rawItems = this.parse(
+      issuePageSchema,
+      value,
+      'GitHub Issue response',
+    );
+    return {
+      items: rawItems
+        .filter((issue) => issue.pull_request === undefined)
+        .map((issue) => this.normalizeIssue(issue)),
+      page,
+      perPage,
+      nextPage: rawItems.length === perPage ? page + 1 : null,
+    };
+  }
+
+  async getIssue(
+    installationId: string,
+    owner: string,
+    repository: string,
+    issueNumber: number,
+  ): Promise<GithubIssueIdentity> {
+    const token = await this.createInstallationToken(installationId);
+    const path = this.repositoryPath(owner, repository);
+    const value = await this.requestJson(
+      `${GITHUB_API_URL}${path}/issues/${issueNumber}`,
+      { headers: this.githubHeaders(token) },
+    );
+    const issue = this.parse(issueSchema, value, 'GitHub Issue response');
+    if (issue.pull_request !== undefined) {
+      throw new NotFoundException('GitHub Issue not found');
+    }
+    return this.normalizeIssue(issue);
+  }
+
   private async createInstallationToken(installationId: string) {
     const value = await this.requestJson(
       `${GITHUB_API_URL}/app/installations/${installationId}/access_tokens`,
@@ -335,6 +406,24 @@ export class GithubAppClient {
       private: repository.private,
       archived: repository.archived,
     };
+  }
+
+  private normalizeIssue(
+    issue: z.infer<typeof issueSchema>,
+  ): GithubIssueIdentity {
+    return {
+      externalIssueId: String(issue.id),
+      number: issue.number,
+      title: issue.title,
+      body: issue.body,
+      state: issue.state,
+      htmlUrl: issue.html_url,
+      updatedAt: issue.updated_at,
+    };
+  }
+
+  private repositoryPath(owner: string, repository: string): string {
+    return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}`;
   }
 
   private parse<T>(schema: z.ZodType<T>, value: unknown, label: string): T {

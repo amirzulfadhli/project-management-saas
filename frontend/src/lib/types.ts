@@ -298,6 +298,46 @@ export interface ConnectGithubRepositoryInput {
   externalRepositoryId: string;
 }
 
+export interface GithubIssueSummary {
+  externalIssueId: string;
+  number: number;
+  title: string;
+  state: "open" | "closed";
+  htmlUrl: string;
+  updatedAt: string;
+  linkedTask: { id: string; title: string } | null;
+}
+
+export interface GithubIssuePage {
+  items: GithubIssueSummary[];
+  page: number;
+  perPage: number;
+  nextPage: number | null;
+  repository: { id: string; fullName: string };
+}
+
+export interface TaskGithubIssue {
+  id: string;
+  taskId: string;
+  projectId: string;
+  externalIssueId: string;
+  number: number;
+  title: string;
+  state: "open" | "closed";
+  htmlUrl: string;
+  repository: { fullName: string };
+  linkedTask: { id: string; title: string };
+  lastSyncedAt: string;
+  unavailableAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTaskFromGithubIssueResult {
+  task: Task;
+  issue: TaskGithubIssue;
+}
+
 export interface CommentItem {
   id: string;
   taskId: string;

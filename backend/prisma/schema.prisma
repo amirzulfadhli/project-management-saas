@@ -114,6 +114,7 @@ model Project {
   team                    Team?                   @relation("ProjectTeams", fields: [teamId], references: [id])
   projectMembers          ProjectMember[]
   repository              Repository?
+  githubIssues            Issue[]                 @relation("IssueProject")
   githubWebhookDeliveries GithubWebhookDelivery[]
   tasks                   Task[]
   wikiPages               WikiPage[]              @relation("WikiPageProject")
@@ -372,19 +373,29 @@ model GithubWebhookDelivery {
 }
 
 model Issue {
-  id           String     @id @default(uuid())
-  number       Int
-  title        String
-  body         String?
-  state        String
-  url          String
-  repositoryId String
-  taskId       String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  closedAt     DateTime?
-  repository   Repository @relation(fields: [repositoryId], references: [id])
-  task         Task?      @relation(fields: [taskId], references: [id])
+  id              String     @id @default(uuid())
+  number          Int
+  title           String
+  body            String?
+  state           String
+  url             String
+  externalIssueId String?
+  projectId       String?
+  repositoryId    String
+  taskId          String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  lastSyncedAt    DateTime   @default(now())
+  unavailableAt   DateTime?
+  closedAt        DateTime?
+  project         Project?   @relation("IssueProject", fields: [projectId], references: [id], onDelete: Restrict)
+  repository      Repository @relation(fields: [repositoryId], references: [id])
+  task            Task?      @relation(fields: [taskId], references: [id])
+
+  @@unique([taskId])
+  @@unique([repositoryId, externalIssueId])
+  @@unique([repositoryId, number])
+  @@index([projectId, updatedAt])
 }
 
 model Branch {

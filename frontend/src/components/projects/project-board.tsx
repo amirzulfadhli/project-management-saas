@@ -439,6 +439,8 @@ export function ProjectBoard({ id }: { id: string }) {
           onClose={() => setGithubOpen(false)}
           projectId={data.id}
           canAdminister={canAdministerProject}
+          columns={columns}
+          currentUserId={currentUserId}
         />
       ) : null}
 

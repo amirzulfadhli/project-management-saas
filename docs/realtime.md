@@ -42,8 +42,9 @@ Successful committed mutations produce a compact `project:event` envelope:
 
 The implemented event types cover Project update/archive, Project-member
 add/role-change/remove, Column create/rename/delete, Task
-create/update/move/delete, Comment create/update/delete, and repository
-connect/disconnect and attachment create/delete. `TASK_MOVED` deliberately covers both cross-Column movement
+create/update/move/delete, Comment create/update/delete, repository
+connect/disconnect, GitHub Issue link/unlink/sync/import, and attachment
+create/delete. `TASK_MOVED` deliberately covers both cross-Column movement
 and same-Column ordering changes for realtime reconciliation. Wiki create,
 update, move, and delete use compact `WIKI_PAGE_*` events. Same-Column
 reordering still creates no Activity entry, preserving the existing low-noise
@@ -78,6 +79,8 @@ Project-scoped TanStack Query keys:
 - Project member -> that Project's roster, detail, and Activity
 - Comment -> that Task's Comments and that Project's Activity
 - repository -> that Project's repository and Activity
+- GitHub Issue -> that user's Project Issue discovery, affected Task link,
+  Project Tasks, and Activity for explicit user actions
 - attachment -> that Project's attachment list, the affected Task attachment
   list when present, and Activity
 - Wiki page -> that user's Project Wiki list, affected page detail, and Activity

@@ -24,6 +24,7 @@ import {
 } from './github.constants';
 import { normalizeGithubWebhook } from './github-webhook';
 import { GithubAppService } from './github-app.service';
+import { GithubIssuesService } from './github-issues.service';
 
 const repositorySelect = {
   id: true,
@@ -51,6 +52,7 @@ export class GithubService {
     private readonly access: AccessService,
     private readonly activities: ActivitiesService,
     private readonly githubApp: GithubAppService,
+    private readonly githubIssues: GithubIssuesService,
     @Inject(GITHUB_WEBHOOK_SECRET)
     private readonly webhookSecret: string | undefined,
   ) {}
@@ -159,6 +161,8 @@ export class GithubService {
         },
       });
 
+      await this.githubIssues.removeRepositoryLinks(tx, repository.id);
+
       try {
         await tx.repository.delete({ where: { id: repository.id } });
       } catch (error: unknown) {
@@ -213,14 +217,17 @@ export class GithubService {
     const connectedRepositoryId = repository.id;
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const existing = await tx.githubWebhookDelivery.findUnique({
           where: { deliveryId },
           select: { id: true, eventType: true, repositoryId: true },
         });
         if (existing) {
           this.assertSameDelivery(existing, eventName, connectedRepositoryId);
-          return { accepted: true, duplicate: true, deliveryId };
+          return {
+            response: { accepted: true, duplicate: true, deliveryId },
+            sync: null,
+          };
         }
 
         await tx.githubWebhookDelivery.create({
@@ -237,8 +244,19 @@ export class GithubService {
             },
           },
         });
-        return { accepted: true, duplicate: false, deliveryId };
+        const sync = await this.githubIssues.syncWebhookIssue(
+          tx,
+          connectedProjectId,
+          connectedRepositoryId,
+          normalized.issue,
+        );
+        return {
+          response: { accepted: true, duplicate: false, deliveryId },
+          sync,
+        };
       });
+      if (result.sync) await this.githubIssues.publishWebhookSync(result.sync);
+      return result.response;
     } catch (error: unknown) {
       if (!this.isUniqueConstraintViolation(error)) throw error;
       const existing = await this.prisma.githubWebhookDelivery.findUnique({

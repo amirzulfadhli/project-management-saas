@@ -9,7 +9,12 @@ import type { AccessService } from '../access/access.service';
 import type { ActivitiesService } from '../activities/activities.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { GithubAppService } from './github-app.service';
+import type { GithubIssuesService } from './github-issues.service';
 import { GithubService } from './github.service';
+
+jest.mock('../realtime/realtime.service', () => ({
+  RealtimeService: class RealtimeService {},
+}));
 
 describe('GithubService', () => {
   const projectId = '10000000-0000-4000-8000-000000000001';
@@ -58,6 +63,11 @@ describe('GithubService', () => {
   let githubApp: {
     getVerifiedRepository: jest.Mock;
     assertOwnedInstallation: jest.Mock;
+  };
+  let githubIssues: {
+    removeRepositoryLinks: jest.Mock;
+    syncWebhookIssue: jest.Mock;
+    publishWebhookSync: jest.Mock;
   };
   let service: GithubService;
 
@@ -109,11 +119,17 @@ describe('GithubService', () => {
       }),
       assertOwnedInstallation: jest.fn(),
     };
+    githubIssues = {
+      removeRepositoryLinks: jest.fn(),
+      syncWebhookIssue: jest.fn().mockResolvedValue(null),
+      publishWebhookSync: jest.fn(),
+    };
     service = new GithubService(
       prisma as unknown as PrismaService,
       access as unknown as AccessService,
       activities as unknown as ActivitiesService,
       githubApp as unknown as GithubAppService,
+      githubIssues as unknown as GithubIssuesService,
       secret,
     );
   });
@@ -216,7 +232,15 @@ describe('GithubService', () => {
       JSON.stringify({
         repository: { id: 123456, full_name: 'flowplan/example' },
         action: 'opened',
-        issue: { number: 1, title: 'Example', state: 'open' },
+        issue: {
+          id: 1001,
+          number: 1,
+          title: 'Example',
+          body: null,
+          state: 'open',
+          html_url: 'https://github.com/flowplan/example/issues/1',
+          updated_at: '2026-09-10T00:00:00Z',
+        },
       }),
     );
 

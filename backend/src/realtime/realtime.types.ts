@@ -16,6 +16,10 @@ export const RealtimeEventType = {
   COMMENT_DELETED: 'COMMENT_DELETED',
   REPOSITORY_CONNECTED: 'REPOSITORY_CONNECTED',
   REPOSITORY_DISCONNECTED: 'REPOSITORY_DISCONNECTED',
+  GITHUB_ISSUE_LINKED: 'GITHUB_ISSUE_LINKED',
+  GITHUB_ISSUE_UNLINKED: 'GITHUB_ISSUE_UNLINKED',
+  GITHUB_ISSUE_SYNCED: 'GITHUB_ISSUE_SYNCED',
+  TASK_CREATED_FROM_GITHUB_ISSUE: 'TASK_CREATED_FROM_GITHUB_ISSUE',
   ATTACHMENT_CREATED: 'ATTACHMENT_CREATED',
   ATTACHMENT_DELETED: 'ATTACHMENT_DELETED',
   WIKI_PAGE_CREATED: 'WIKI_PAGE_CREATED',
@@ -37,6 +41,7 @@ export type RealtimeEntity =
   | 'task'
   | 'comment'
   | 'repository'
+  | 'github-issue'
   | 'attachment'
   | 'wiki-page'
   | 'time-entry';
@@ -46,7 +51,7 @@ export interface RealtimeEventInput {
   type: RealtimeEventType;
   entity: RealtimeEntity;
   entityId: string;
-  actorId: string;
+  actorId: string | null;
   taskId?: string;
 }
 

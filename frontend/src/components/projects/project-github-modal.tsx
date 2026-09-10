@@ -5,10 +5,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/queries";
 import type {
+  Column,
   GithubInstallation,
   GithubRepository,
   ProjectRepository,
 } from "@/lib/types";
+import { ProjectGithubIssues } from "@/components/github/project-github-issues";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -24,6 +26,8 @@ interface ProjectGithubModalProps {
   onClose: () => void;
   projectId: string;
   canAdminister: boolean;
+  columns: Column[];
+  currentUserId: string | null;
 }
 
 function changedInstallation(
@@ -63,6 +67,8 @@ export function ProjectGithubModal({
   onClose,
   projectId,
   canAdminister,
+  columns,
+  currentUserId,
 }: ProjectGithubModalProps) {
   const queryClient = useQueryClient();
   const popupRef = useRef<Window | null>(null);
@@ -302,6 +308,9 @@ export function ProjectGithubModal({
             canAdminister={canAdminister}
             disconnectPending={disconnectRepository.isPending}
             onDisconnect={confirmDisconnect}
+            projectId={projectId}
+            columns={columns}
+            currentUserId={currentUserId}
           />
         ) : !canAdminister ? (
           <EmptyState
@@ -435,11 +444,17 @@ function ConnectedRepository({
   canAdminister,
   disconnectPending,
   onDisconnect,
+  projectId,
+  columns,
+  currentUserId,
 }: {
   repository: ProjectRepository;
   canAdminister: boolean;
   disconnectPending: boolean;
   onDisconnect: () => void;
+  projectId: string;
+  columns: Column[];
+  currentUserId: string | null;
 }) {
   return (
     <div className="space-y-4">
@@ -483,6 +498,11 @@ function ConnectedRepository({
         Disconnecting removes only FlowPlan&apos;s Project connection. It does
         not delete GitHub data or historical FlowPlan Activity.
       </p>
+      <ProjectGithubIssues
+        projectId={projectId}
+        columns={columns}
+        currentUserId={currentUserId}
+      />
     </div>
   );
 }

@@ -56,6 +56,18 @@ const activityDefinitions: Record<string, ActivityDefinition> = {
     fallback: "disconnected a GitHub repository",
     category: "integration",
   },
+  GITHUB_ISSUE_LINKED: {
+    fallback: "linked a Task to a GitHub Issue",
+    category: "integration",
+  },
+  GITHUB_ISSUE_UNLINKED: {
+    fallback: "unlinked a GitHub Issue",
+    category: "integration",
+  },
+  TASK_CREATED_FROM_GITHUB_ISSUE: {
+    fallback: "created a Task from a GitHub Issue",
+    category: "integration",
+  },
   ATTACHMENT_UPLOADED: {
     fallback: "uploaded an attachment",
     category: "integration",

@@ -49,7 +49,15 @@ describe('normalizeGithubWebhook', () => {
       normalizeGithubWebhook('issues', {
         repository,
         action: 'closed',
-        issue: { number: 12, title: 'Bug', state: 'closed' },
+        issue: {
+          id: 1012,
+          number: 12,
+          title: 'Bug',
+          body: 'Details',
+          state: 'closed',
+          html_url: 'https://github.com/flowplan/example/issues/12',
+          updated_at: '2026-09-10T00:00:00Z',
+        },
         sender: { login: 'octocat' },
       }).metadata,
     ).toEqual({

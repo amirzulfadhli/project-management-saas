@@ -57,6 +57,7 @@ describe('TasksService', () => {
       delete: jest.Mock;
     };
     project: { findMany: jest.Mock; findFirst: jest.Mock };
+    issue: { deleteMany: jest.Mock };
   };
   let access: {
     assertProjectAccess: jest.Mock;
@@ -87,6 +88,7 @@ describe('TasksService', () => {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue({ id: 'p1' }),
       },
+      issue: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
     };
     database.$transaction.mockImplementation(
       (operation: (tx: Prisma.TransactionClient) => Promise<unknown>) =>

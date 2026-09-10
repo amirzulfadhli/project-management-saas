@@ -5,6 +5,10 @@ import { App } from 'supertest/types';
 import { GithubService } from './github.service';
 import { GithubWebhooksController } from './github-webhooks.controller';
 
+jest.mock('../realtime/realtime.service', () => ({
+  RealtimeService: class RealtimeService {},
+}));
+
 describe('GithubWebhooksController raw body', () => {
   let app: INestApplication<App>;
   const receiveWebhook = jest.fn().mockResolvedValue({

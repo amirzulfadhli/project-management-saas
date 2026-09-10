@@ -13,6 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { TaskComments } from "@/components/tasks/task-comments";
 import { AttachmentsPanel } from "@/components/attachments/attachments-panel";
 import { TaskTimePanel } from "@/components/time-tracking/task-time-panel";
+import { TaskGithubPanel } from "@/components/github/task-github-panel";
 
 interface TaskModalProps {
   onClose: () => void;
@@ -64,7 +65,7 @@ export function TaskModal({
   );
   const [error, setError] = useState<string | null>(null);
   const [activePanel, setActivePanel] = useState<
-    "details" | "comments" | "attachments" | "time"
+    "details" | "comments" | "attachments" | "time" | "github"
   >("details");
 
   const listKey = queryKeys.tasks(projectId);
@@ -302,30 +303,30 @@ export function TaskModal({
     >
       {isEdit ? (
         <div
-          className="mb-4 flex gap-1 rounded-md bg-hover p-1"
+          className="mb-4 flex flex-wrap gap-1 rounded-md bg-hover p-1"
           role="tablist"
           aria-label="Task sections"
         >
-          {(["details", "comments", "attachments", "time"] as const).map(
-            (panel) => (
-              <button
-                key={panel}
-                id={`task-${panel}-tab`}
-                type="button"
-                role="tab"
-                aria-selected={activePanel === panel}
-                aria-controls={`task-${panel}-panel`}
-                onClick={() => setActivePanel(panel)}
-                className={`flex-1 rounded-sm px-3 py-2 text-sm font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                  activePanel === panel
-                    ? "bg-surface text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                {panel}
-              </button>
-            ),
-          )}
+          {(
+            ["details", "comments", "attachments", "time", "github"] as const
+          ).map((panel) => (
+            <button
+              key={panel}
+              id={`task-${panel}-tab`}
+              type="button"
+              role="tab"
+              aria-selected={activePanel === panel}
+              aria-controls={`task-${panel}-panel`}
+              onClick={() => setActivePanel(panel)}
+              className={`min-w-24 flex-1 rounded-sm px-3 py-2 text-sm font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                activePanel === panel
+                  ? "bg-surface text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              {panel}
+            </button>
+          ))}
         </div>
       ) : null}
 
@@ -540,6 +541,19 @@ export function TaskModal({
           aria-labelledby="task-time-tab"
         >
           <TaskTimePanel
+            taskId={task.id}
+            projectId={projectId}
+            currentUserId={currentUserId}
+          />
+        </div>
+      ) : activePanel === "github" && task ? (
+        <div
+          id="task-github-panel"
+          role="tabpanel"
+          aria-labelledby="task-github-tab"
+          className="max-h-[68vh] overflow-y-auto pr-1"
+        >
+          <TaskGithubPanel
             taskId={task.id}
             projectId={projectId}
             currentUserId={currentUserId}

@@ -39,7 +39,8 @@ Browser -> Next.js frontend -> NestJS API -> PostgreSQL
 - Authenticated Project-scoped realtime cache reconciliation for collaborative
   Project, Task, Column, Comment, membership, and repository changes
 - GitHub App installation, verified repository discovery/connection, signed
-  webhook ingestion, and Project-level connection management UI
+  webhook ingestion, Project-level connection management UI, and explicit
+  GitHub Issue linking/import with conservative one-way Task synchronization
 
 ## Local development
 
@@ -76,7 +77,7 @@ runs those checks from clean installs.
 
 The repository root is this directory. From a clean clone, both applications
 use their committed `package-lock.json` files through `npm ci`; Prisma Client is
-generated rather than committed, and all fifteen production migrations remain in
+generated rather than committed, and all sixteen production migrations remain in
 source control. GitHub Actions uses only disposable CI configuration and a
 PostgreSQL service—no production or staging secrets are required.
 
@@ -96,7 +97,7 @@ staging deployment.
 - Attachments currently use one persistent local filesystem volume. Horizontal
   backend scaling requires a shared object-storage provider and object migration.
 - Project access intentionally includes Organization-level inherited access.
-- Live GitHub App verification, issue sync, presence, Calendar, AI features,
+- Live GitHub App/Issue-sync verification, presence, Calendar, AI features,
   Teams, and advanced RBAC are future work. Wiki rich text, version history,
   and live character-level collaboration are intentionally not part of the
   current Markdown documentation core.

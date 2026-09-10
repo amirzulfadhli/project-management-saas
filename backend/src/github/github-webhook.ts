@@ -35,9 +35,13 @@ const pullRequestSchema = commonSchema.extend({
 const issuesSchema = commonSchema.extend({
   action: z.string().min(1).max(50),
   issue: z.object({
+    id: z.union([z.number().int().positive(), z.string().regex(/^[1-9]\d*$/)]),
     number: z.number().int().positive(),
     title: z.string().max(1000),
-    state: z.string().max(30),
+    body: z.string().max(250_000).nullable(),
+    state: z.enum(['open', 'closed']),
+    html_url: z.string().url().startsWith('https://github.com/'),
+    updated_at: z.string().datetime(),
   }),
 });
 
@@ -50,6 +54,16 @@ export interface NormalizedGithubWebhook {
   externalRepositoryId: string;
   fullName: string;
   metadata: GithubEventMetadata;
+  issue?: {
+    action: string;
+    externalIssueId: string;
+    number: number;
+    title: string;
+    body: string | null;
+    state: 'open' | 'closed';
+    htmlUrl: string;
+    updatedAt: string;
+  };
 }
 
 export function normalizeGithubWebhook(
@@ -100,6 +114,16 @@ export function normalizeGithubWebhook(
         title: payload.issue.title.slice(0, 300),
         state: payload.issue.state,
         actor: payload.sender?.login ?? null,
+      },
+      issue: {
+        action: payload.action,
+        externalIssueId: String(payload.issue.id),
+        number: payload.issue.number,
+        title: payload.issue.title,
+        body: payload.issue.body,
+        state: payload.issue.state,
+        htmlUrl: payload.issue.html_url,
+        updatedAt: payload.issue.updated_at,
       },
     };
   } catch (error: unknown) {

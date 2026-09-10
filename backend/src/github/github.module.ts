@@ -13,6 +13,11 @@ import { GithubAppService } from './github-app.service';
 import { GithubService } from './github.service';
 import { GithubWebhooksController } from './github-webhooks.controller';
 import { ProjectRepositoriesController } from './project-repositories.controller';
+import {
+  ProjectGithubIssuesController,
+  TaskGithubIssueController,
+} from './github-issues.controller';
+import { GithubIssuesService } from './github-issues.service';
 
 @Module({
   imports: [ActivitiesModule],
@@ -20,11 +25,14 @@ import { ProjectRepositoriesController } from './project-repositories.controller
     ProjectRepositoriesController,
     GithubWebhooksController,
     GithubAppController,
+    ProjectGithubIssuesController,
+    TaskGithubIssueController,
   ],
   providers: [
     GithubService,
     GithubAppService,
     GithubAppClient,
+    GithubIssuesService,
     {
       provide: GITHUB_WEBHOOK_SECRET,
       useValue: environment.githubWebhookSecret,

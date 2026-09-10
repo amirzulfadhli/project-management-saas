@@ -49,6 +49,8 @@ describe('GitHub integration core backend (e2e)', () => {
       | 'getInstallation'
       | 'listRepositories'
       | 'getRepository'
+      | 'listIssues'
+      | 'getIssue'
     >
   >;
 
@@ -91,6 +93,22 @@ describe('GitHub integration core backend (e2e)', () => {
       getRepository: jest
         .fn<GithubAppClient['getRepository']>()
         .mockResolvedValue(verifiedRepository()),
+      listIssues: jest
+        .fn<GithubAppClient['listIssues']>()
+        .mockImplementation(
+          (_installation, _owner, _repository, page, perPage) =>
+            Promise.resolve({
+              items: [verifiedIssue(42)],
+              page,
+              perPage,
+              nextPage: null,
+            }),
+        ),
+      getIssue: jest
+        .fn<GithubAppClient['getIssue']>()
+        .mockImplementation((_installation, _owner, _repository, number) =>
+          Promise.resolve(verifiedIssue(number)),
+        ),
     };
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -181,6 +199,9 @@ describe('GitHub integration core backend (e2e)', () => {
         select: { id: true },
       });
       const repositoryIds = repositories.map((item) => item.id);
+      await prisma.issue.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
       await prisma.githubWebhookDelivery.deleteMany({
         // Deliveries deliberately retain Project scope after repository
         // disconnect sets repositoryId to null, so cleanup must use projectId.
@@ -277,7 +298,15 @@ describe('GitHub integration core backend (e2e)', () => {
     return {
       ...common,
       action: 'closed',
-      issue: { number: 9, title: 'Example issue', state: 'closed' },
+      issue: {
+        id: 9009,
+        number: 9,
+        title: 'Example issue',
+        body: 'Example body',
+        state: 'closed',
+        html_url: 'https://github.com/flowplan-tests/webhook-source/issues/9',
+        updated_at: '2026-09-10T00:00:00Z',
+      },
     };
   }
 
@@ -316,6 +345,18 @@ describe('GitHub integration core backend (e2e)', () => {
       htmlUrl: 'https://github.com/flowplan-tests/project-alpha',
       private: true,
       archived: false,
+    };
+  }
+
+  function verifiedIssue(number: number) {
+    return {
+      externalIssueId: String(900000 + number),
+      number,
+      title: `GitHub Issue ${number}`,
+      body: `Body for Issue ${number}`,
+      state: 'open' as const,
+      htmlUrl: `https://github.com/flowplan-tests/project-alpha/issues/${number}`,
+      updatedAt: '2026-09-10T00:00:00Z',
     };
   }
 
@@ -493,6 +534,140 @@ describe('GitHub integration core backend (e2e)', () => {
     expect(
       await prisma.githubWebhookDelivery.count({ where: { deliveryId } }),
     ).toBe(1);
+  });
+
+  it('links and imports verified Issues with database conflict protection', async () => {
+    const repository = await prisma.repository.findUniqueOrThrow({
+      where: { projectId: projectA.id },
+    });
+    const column = await prisma.column.findFirstOrThrow({
+      where: { projectId: projectA.id },
+      orderBy: { position: 'asc' },
+    });
+    const taskResponses = await Promise.all(
+      ['Link target A', 'Link target B', 'Link target C'].map((title) =>
+        memberClient
+          .post('/api/tasks')
+          .send({ title, projectId: projectA.id, columnId: column.id })
+          .expect(201),
+      ),
+    );
+    const taskIds = taskResponses.map(
+      (response) => (response.body as { id: string }).id,
+    );
+
+    await outsiderClient
+      .get(`/api/projects/${projectA.id}/github/issues`)
+      .expect(403);
+    const discovery = await memberClient
+      .get(`/api/projects/${projectA.id}/github/issues`)
+      .query({ page: 1, perPage: 30, state: 'open' })
+      .expect(200);
+    expect(discovery.body).toMatchObject({
+      repository: { id: repository.id },
+      items: [{ number: 42, linkedTask: null }],
+    });
+
+    await memberClient
+      .post(`/api/tasks/${taskIds[0]}/github/link`)
+      .send({ issueNumber: 42, owner: 'spoofed' })
+      .expect(400);
+    const linked = await memberClient
+      .post(`/api/tasks/${taskIds[0]}/github/link`)
+      .send({ issueNumber: 42 })
+      .expect(201);
+    expect(linked.body).toMatchObject({
+      taskId: taskIds[0],
+      externalIssueId: '900042',
+      number: 42,
+      repository: { fullName: 'flowplan-tests/project-alpha' },
+    });
+    expect(JSON.stringify(linked.body)).not.toContain('token');
+    await outsiderClient.get(`/api/tasks/${taskIds[0]}/github`).expect(403);
+
+    const concurrentLinks = await Promise.all([
+      memberClient
+        .post(`/api/tasks/${taskIds[1]}/github/link`)
+        .send({ issueNumber: 44 }),
+      memberClient
+        .post(`/api/tasks/${taskIds[2]}/github/link`)
+        .send({ issueNumber: 44 }),
+    ]);
+    expect(concurrentLinks.map(({ status }) => status).sort()).toEqual([
+      201, 409,
+    ]);
+
+    const concurrentImports = await Promise.all([
+      memberClient
+        .post(`/api/projects/${projectA.id}/github/issues/43/create-task`)
+        .send({ columnId: column.id }),
+      memberClient
+        .post(`/api/projects/${projectA.id}/github/issues/43/create-task`)
+        .send({ columnId: column.id }),
+    ]);
+    expect(concurrentImports.map(({ status }) => status).sort()).toEqual([
+      201, 409,
+    ]);
+    expect(
+      await prisma.issue.count({
+        where: { repositoryId: repository.id, externalIssueId: '900043' },
+      }),
+    ).toBe(1);
+  });
+
+  it('syncs only a linked Issue and unlink stops later webhook changes', async () => {
+    const repository = await prisma.repository.findUniqueOrThrow({
+      where: { projectId: projectA.id },
+    });
+    const link = await prisma.issue.findUniqueOrThrow({
+      where: {
+        repositoryId_externalIssueId: {
+          repositoryId: repository.id,
+          externalIssueId: '900042',
+        },
+      },
+    });
+    const notificationCount = await prisma.notification.count({
+      where: { projectId: projectA.id },
+    });
+    const payload = {
+      repository: {
+        id: 123456,
+        full_name: 'flowplan-tests/project-alpha',
+      },
+      sender: { login: 'octocat' },
+      action: 'edited',
+      issue: {
+        id: 900042,
+        number: 42,
+        title: 'GitHub changed title',
+        body: 'GitHub changed body',
+        state: 'closed',
+        html_url: 'https://github.com/flowplan-tests/project-alpha/issues/42',
+        updated_at: '2026-09-10T01:00:00Z',
+      },
+    };
+    await signedWebhook('issues', payload).expect(202);
+    expect(
+      await prisma.task.findUniqueOrThrow({ where: { id: link.taskId! } }),
+    ).toMatchObject({
+      title: 'GitHub changed title',
+      description: 'GitHub changed body',
+    });
+
+    await memberClient
+      .delete(`/api/tasks/${link.taskId!}/github/link`)
+      .expect(204);
+    await signedWebhook('issues', {
+      ...payload,
+      issue: { ...payload.issue, title: 'Must not synchronize' },
+    }).expect(202);
+    expect(
+      await prisma.task.findUniqueOrThrow({ where: { id: link.taskId! } }),
+    ).toMatchObject({ title: 'GitHub changed title' });
+    expect(
+      await prisma.notification.count({ where: { projectId: projectA.id } }),
+    ).toBe(notificationCount);
   });
 
   it('allows owner disconnect, preserves replay protection, and leaves a user-attributed Activity event', async () => {

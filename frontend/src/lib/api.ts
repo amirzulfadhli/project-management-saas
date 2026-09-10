@@ -42,6 +42,9 @@ import type {
   CreateWikiPageInput,
   UpdateWikiPageInput,
   MoveWikiPageInput,
+  GithubIssuePage,
+  TaskGithubIssue,
+  CreateTaskFromGithubIssueResult,
 } from "./types";
 
 const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
@@ -330,6 +333,42 @@ export const api = {
     request<void>(`/api/projects/${encodeURIComponent(projectId)}/repository`, {
       method: "DELETE",
     }),
+  getProjectGithubIssues: (
+    projectId: string,
+    options: {
+      page?: number;
+      perPage?: number;
+      state?: "open" | "closed" | "all";
+    } = {},
+  ) =>
+    request<GithubIssuePage>(
+      withQuery(
+        `/api/projects/${encodeURIComponent(projectId)}/github/issues`,
+        options,
+      ),
+    ),
+  getTaskGithubIssue: (taskId: string) =>
+    request<TaskGithubIssue | null>(
+      `/api/tasks/${encodeURIComponent(taskId)}/github`,
+    ),
+  linkTaskGithubIssue: (taskId: string, issueNumber: number) =>
+    request<TaskGithubIssue>(
+      `/api/tasks/${encodeURIComponent(taskId)}/github/link`,
+      { method: "POST", body: JSON.stringify({ issueNumber }) },
+    ),
+  unlinkTaskGithubIssue: (taskId: string) =>
+    request<void>(`/api/tasks/${encodeURIComponent(taskId)}/github/link`, {
+      method: "DELETE",
+    }),
+  createTaskFromGithubIssue: (
+    projectId: string,
+    issueNumber: number,
+    columnId: string,
+  ) =>
+    request<CreateTaskFromGithubIssueResult>(
+      `/api/projects/${encodeURIComponent(projectId)}/github/issues/${issueNumber}/create-task`,
+      { method: "POST", body: JSON.stringify({ columnId }) },
+    ),
 
   // Tasks
   getTasks: (projectId: string, filters: TaskFilters = {}) =>

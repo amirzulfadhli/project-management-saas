@@ -301,6 +301,7 @@ export class TasksService {
               : null,
           },
         });
+        await tx.issue.deleteMany({ where: { taskId: id } });
         await tx.task.delete({ where: { id } });
         await this.normalizeColumn(tx, task.columnId, task.projectId);
         return { projectId: task.projectId };

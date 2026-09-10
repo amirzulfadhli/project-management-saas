@@ -124,6 +124,11 @@ deliveries do not create Activity yet: GitHub actors are external while the
 current Activity schema requires a FlowPlan user. Inventing an Organization
 owner as actor would create misleading history.
 
+Explicit Issue link, unlink, and create-Task-from-Issue actions do create
+compact, user-attributed Project Activity. Routine webhook synchronization does
+not create Activity or Notifications. See
+[GitHub Issue and FlowPlan Task synchronization](github-issue-task-sync.md).
+
 ## Configuration and secrets
 
 GitHub App discovery is an all-or-nothing backend configuration group:
@@ -150,9 +155,9 @@ are separate from Better Auth's optional `GITHUB_CLIENT_ID` and
 - live GitHub App/public HTTPS callback and webhook verification
 - installation deletion/suspension lifecycle handling
 - external/system actors in Activity
-- issue-to-Task or Task-to-Issue synchronization
+- FlowPlan-to-GitHub writes and automatic Issue import
 - pull request/branch linking and automation
-- background retries, Notifications, and realtime delivery
+- background retries and durable webhook processing
 
 The callback returns a compact verified installation record. The Project modal
 opens installation in a popup and polls the authenticated installation list;
@@ -183,24 +188,27 @@ TanStack Query cache boundaries are explicit:
 ["github-installations"]
 ["github-repositories", { installationId, page, perPage }]
 ["project-repository", { projectId }]
+["github-issues", { projectId, userId, page, perPage, state }]
+["task-github-issue", { taskId, userId }]
 ```
 
-Connection mutations update only the current Project repository cache and
-invalidate only that Project's Activity feed. Frontend role checks control
-visible actions only; NestJS remains the authorization boundary.
+Connection and Issue-link mutations update only their current Project/Task
+GitHub caches and the affected Project Task/Activity scopes. Frontend role
+checks control visible actions only; NestJS remains the authorization boundary.
 
 ## Verification
 
-The ninth additive migration applied to development, and all nine committed
-migrations deployed from zero to a disposable database that was then removed.
-Prisma reports the development schema current.
+All sixteen migrations apply to development and deploy from zero to a
+disposable database that is removed after verification. Prisma reports the
+development schema current with no drift.
 
-GitHub E2E passes 10/10 tests and the complete PostgreSQL E2E suite passes
-67/67 across 10 suites. GitHub/config unit coverage passes 36/36 across six
+GitHub E2E passes 12/12 tests and the complete PostgreSQL E2E suite passes
+103/103 across 16 suites. The full backend unit suite passes 157/157 across 27
 suites. Tests cover state/PKCE flow, installation persistence and isolation,
-discovery pagination, verified metadata, authorization, strict input,
-connection conflicts, webhook signatures/mapping/normalization/idempotency,
-disconnect/replay, and secret-safe responses.
+repository and Issue discovery, verified metadata, authorization, strict input,
+connection/link/import conflicts, concurrent duplicate protection, webhook
+signatures/mapping/normalization/idempotency/synchronization, unlink/replay,
+realtime invalidation, Notification silence, and secret-safe responses.
 
 External GitHub HTTP calls are mocked in automated tests. These results do not
 claim live GitHub App installation or public webhook delivery.

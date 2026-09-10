@@ -150,6 +150,72 @@ describe('GithubAppClient', () => {
     });
   });
 
+  it('lists Issues without pull requests and verifies one Issue by number', async () => {
+    fetchMock
+      .mockResolvedValueOnce(installationToken())
+      .mockResolvedValueOnce(
+        jsonResponse([
+          githubIssueByNumber(41),
+          {
+            ...githubIssueByNumber(42),
+            pull_request: { url: 'not-an-issue' },
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(installationToken())
+      .mockResolvedValueOnce(jsonResponse(githubIssueByNumber(41)));
+
+    await expect(
+      client.listIssues('987', 'flowplan', 'alpha', 1, 2, 'open'),
+    ).resolves.toMatchObject({
+      items: [{ externalIssueId: '9041', number: 41 }],
+      nextPage: 2,
+    });
+    await expect(
+      client.getIssue('987', 'flowplan', 'alpha', 41),
+    ).resolves.toMatchObject({
+      externalIssueId: '9041',
+      title: 'Issue 41',
+      state: 'open',
+    });
+    expect(requestUrl(fetchMock.mock.calls[1][0])).toContain(
+      '/repos/flowplan/alpha/issues?',
+    );
+  });
+
+  it('lists only Issues, paginates, and verifies one Issue with fresh installation tokens', async () => {
+    const token = () =>
+      jsonResponse({
+        token: 'ghs_transient',
+        expires_at: '2099-01-01T00:00:00Z',
+      });
+    fetchMock
+      .mockResolvedValueOnce(token())
+      .mockResolvedValueOnce(
+        jsonResponse([
+          githubIssue(41, 7, 'Open bug'),
+          { ...githubIssue(42, 8, 'Pull request'), pull_request: {} },
+        ]),
+      )
+      .mockResolvedValueOnce(token())
+      .mockResolvedValueOnce(jsonResponse(githubIssue(41, 7, 'Open bug')));
+
+    await expect(
+      client.listIssues('987', 'flowplan', 'alpha', 1, 2, 'open'),
+    ).resolves.toMatchObject({
+      items: [{ externalIssueId: '41', number: 7, title: 'Open bug' }],
+      page: 1,
+      perPage: 2,
+      nextPage: 2,
+    });
+    await expect(
+      client.getIssue('987', 'flowplan', 'alpha', 7),
+    ).resolves.toMatchObject({ externalIssueId: '41', number: 7 });
+    expect(requestUrl(fetchMock.mock.calls[1][0])).toContain(
+      '/repos/flowplan/alpha/issues?',
+    );
+  });
+
   it.each([
     [401, {}, BadGatewayException, undefined],
     [403, {}, BadGatewayException, undefined],
@@ -205,4 +271,40 @@ function githubRepository(id: number, name: string) {
     archived: false,
     owner: { login: 'flowplan' },
   };
+}
+
+function installationToken() {
+  return jsonResponse({
+    token: 'ghs_transient',
+    expires_at: '2099-01-01T00:00:00Z',
+  });
+}
+
+function githubIssueByNumber(number: number) {
+  return {
+    id: 9000 + number,
+    number,
+    title: `Issue ${number}`,
+    body: 'Issue body',
+    state: 'open',
+    html_url: `https://github.com/flowplan/alpha/issues/${number}`,
+    updated_at: '2026-09-10T00:00:00Z',
+  };
+}
+
+function githubIssue(id: number, number: number, title: string) {
+  return {
+    id,
+    number,
+    title,
+    body: 'Issue body',
+    state: 'open',
+    html_url: `https://github.com/flowplan/alpha/issues/${number}`,
+    updated_at: '2026-09-10T00:00:00Z',
+  };
+}
+
+function requestUrl(input: string | URL | Request): string {
+  if (typeof input === 'string') return input;
+  return input instanceof URL ? input.href : input.url;
 }
