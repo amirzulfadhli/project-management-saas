@@ -342,7 +342,7 @@ function SortableTaskCard({
             disabled={disabled}
             aria-label={`Move ${task.title}`}
             title="Drag to move. Keyboard: Space to pick up, arrows to move, Space or Enter to drop, Escape to cancel."
-            className="flex min-h-7 min-w-7 cursor-grab touch-none items-center justify-center rounded p-2 text-text-secondary opacity-70 transition-opacity hover:bg-hover hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary active:cursor-grabbing group-hover:opacity-100 disabled:cursor-wait"
+            className="flex min-h-[40px] min-w-[40px] cursor-grab touch-none items-center justify-center rounded p-2 text-text-secondary opacity-70 transition-opacity hover:bg-hover hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary active:cursor-grabbing group-hover:opacity-100 disabled:cursor-wait"
           >
             <span aria-hidden="true" className="block text-xs leading-none">
               ::

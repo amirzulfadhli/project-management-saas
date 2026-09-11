@@ -145,7 +145,7 @@ export function AttachmentsPanel({
             PNG, JPG, WebP, PDF, TXT, or CSV up to 10 MB.
           </p>
         </div>
-        <label className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+        <label className="control-target inline-flex cursor-pointer items-center justify-center rounded-md bg-primary px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
           {upload.isPending ? "Uploading..." : "Upload file"}
           <input
             ref={inputRef}

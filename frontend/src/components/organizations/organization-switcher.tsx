@@ -4,7 +4,11 @@ import Link from "next/link";
 import { Select } from "@/components/ui/select";
 import { useOrganization } from "./organization-provider";
 
-export function OrganizationSwitcher() {
+export function OrganizationSwitcher({
+  onNavigate,
+}: {
+  onNavigate?: () => void;
+}) {
   const { organizations, selectedOrganizationId, selectOrganization } =
     useOrganization();
 
@@ -12,6 +16,7 @@ export function OrganizationSwitcher() {
     return (
       <Link
         href="/organizations"
+        onClick={onNavigate}
         className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         Create organization
@@ -20,10 +25,10 @@ export function OrganizationSwitcher() {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="mt-2 min-w-0">
       <Select
         aria-label="Current organization"
-        className="w-32 min-w-0 sm:w-auto sm:min-w-40 sm:max-w-56"
+        className="max-w-full"
         value={selectedOrganizationId ?? ""}
         onChange={(event) => selectOrganization(event.target.value)}
       >
@@ -33,12 +38,6 @@ export function OrganizationSwitcher() {
           </option>
         ))}
       </Select>
-      <Link
-        href="/organizations"
-        className="hidden text-sm font-medium text-text-secondary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:inline"
-      >
-        Manage
-      </Link>
     </div>
   );
 }

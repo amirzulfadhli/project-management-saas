@@ -10,8 +10,7 @@ const variantClasses: Record<Variant, string> = {
     "bg-surface text-text-primary border border-border hover:bg-hover focus-visible:ring-primary",
   ghost:
     "bg-transparent text-text-secondary hover:bg-hover hover:text-text-primary focus-visible:ring-primary",
-  danger:
-    "bg-danger text-white hover:bg-danger/90 focus-visible:ring-danger",
+  danger: "bg-danger text-white hover:bg-danger/90 focus-visible:ring-danger",
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -34,7 +33,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={`inline-flex items-center justify-center gap-1.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${sizeClasses[size]} ${className ?? ""}`}
+      className={`control-target inline-flex items-center justify-center gap-1.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${sizeClasses[size]} ${className ?? ""}`}
       {...props}
     />
   );

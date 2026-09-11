@@ -5,7 +5,7 @@
   --color-background: #fafafa;
   --color-surface: #ffffff;
   --color-text-primary: #111827;
-  --color-text-secondary: #6b7280;
+  --color-text-secondary: #596273;
   --color-border: #e5e7eb;
   --color-hover: #f3f4f6;
   --color-primary: #2563eb;
@@ -14,24 +14,27 @@
   --color-danger: #dc2626;
   --color-purple: #7c3aed;
 
-  /* Spacing system (8px base) */
-  --spacing-1: 4px;
-  --spacing-2: 8px;
-  --spacing-3: 12px;
-  --spacing-4: 16px;
-  --spacing-5: 24px;
-  --spacing-6: 32px;
-  --spacing-7: 40px;
-  --spacing-8: 48px;
-  --spacing-9: 64px;
-  --spacing-10: 96px;
-  --spacing-11: 128px;
+  /* Keep Tailwind's numeric spacing predictable: h-10 = 40px. */
+  --spacing: 0.25rem;
 
   /* Border radius */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+
+  --color-navigation: #f5f6f8;
+  --color-raised: #ffffff;
+  --color-selected: #eff4ff;
+  --color-border-strong: #b9c1cd;
+  --color-focus: #2563eb;
+}
+
+:root {
+  --header-height: 3.5rem;
+  --sidebar-width: 14rem;
+  --control-height: 2.25rem;
+  --touch-target: 2.75rem;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -48,17 +51,59 @@
   --color-warning: #d97706;
   --color-danger: #dc2626;
   --color-purple: #7c3aed;
+  --color-navigation: #111114;
+  --color-raised: #18181b;
+  --color-selected: #18233b;
+  --color-border-strong: #52525b;
+  --color-focus: #93b4ff;
 }
 
 body {
   background: var(--color-background);
   color: var(--color-text-primary);
   font-family:
-    Inter,
     ui-sans-serif,
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+}
+
+/* Component roles do not redefine numeric spacing utilities. */
+@layer components {
+  .control-target {
+    min-height: var(--control-height);
+  }
+  .icon-control {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+    flex-shrink: 0;
+    border-radius: var(--radius-md);
+  }
+  @media (pointer: coarse) {
+    .control-target {
+      min-height: var(--touch-target);
+    }
+  }
+}
+
+@layer base {
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }

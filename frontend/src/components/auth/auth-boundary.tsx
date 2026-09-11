@@ -55,5 +55,5 @@ export function AuthBoundary({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  return <MainLayout>{children}</MainLayout>;
+  return <MainLayout key={session?.user.id}>{children}</MainLayout>;
 }

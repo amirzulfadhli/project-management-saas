@@ -20,6 +20,28 @@ gates are not claimed complete.
 
 ## V1 manual QA defect closure 1
 
+### UI refinement Phase A
+
+The approved Phase A shell/navigation and shared-interaction refinement is
+implemented: conventional 4px spacing, restrained radii and semantic surfaces,
+route-aware sidebar, mobile navigation, existing Organization Members access,
+header Notifications and read-only Account identity/sign-out. Shared dialogs
+use native modal behavior with viewport bounds, initial/return focus and nested
+scroll locking. Notification read failures retain their visible error surface.
+Session changes remount shell-local panels while retaining existing cache clearing.
+
+Phase A verification passes: frontend component tests **30/30 in 5 suites**,
+TypeScript, ESLint, changed-file Prettier, production build, normal clean
+dependency installation and `git diff --check`. Backend/PostgreSQL suites were
+not rerun because their implementation and contracts are unchanged.
+
+See [UI refinement](ui-refinement.md) for scope and the manual acceptance checklist.
+No backend, API, realtime handler, schema or database behavior changed. Phase B
+has not begun. **PHASE A MANUAL UI ACCEPTANCE: PENDING.** V1 functional freeze
+remains reopened; automated component checks do not restore it.
+
+### Previous defect-closure verification
+
 V1 functional freeze is **REOPENED** after manual acceptance found that several
 implemented capabilities were either hard to discover or did not reconcile an
 already-open surface. The first closure pass makes Active/Archived Projects an
