@@ -111,9 +111,10 @@ Users ordered by name and membership ID as a final tie-breaker.
 
 ## Frontend roster administration
 
-The Project detail header opens `ProjectMembersModal`. Its query key is
+The Project detail header links to `/projects/:id/members`, using the extracted
+`ProjectMembersPanel`. Its query key is
 `["project-members", { projectId }]`, so a roster cached for Project A cannot
-be rendered for Project B. The modal displays the server-ordered explicit
+be rendered for Project B. The panel displays the server-ordered explicit
 roster, marks the signed-in User, and exposes role/removal controls when the
 current session is an Organization `OWNER` or an explicit Project `OWNER`.
 Those client checks only reduce misleading controls; NestJS remains the

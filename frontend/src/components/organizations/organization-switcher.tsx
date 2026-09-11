@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { Select } from "@/components/ui/select";
 import { useOrganization } from "./organization-provider";
 
@@ -9,6 +10,8 @@ export function OrganizationSwitcher({
 }: {
   onNavigate?: () => void;
 }) {
+  const pathname = usePathname();
+  const router = useRouter();
   const { organizations, selectedOrganizationId, selectOrganization } =
     useOrganization();
 
@@ -30,7 +33,11 @@ export function OrganizationSwitcher({
         aria-label="Current organization"
         className="max-w-full"
         value={selectedOrganizationId ?? ""}
-        onChange={(event) => selectOrganization(event.target.value)}
+        onChange={(event) => {
+          selectOrganization(event.target.value);
+          onNavigate?.();
+          if (pathname.startsWith("/projects/")) router.push("/projects");
+        }}
       >
         {organizations.map((organization) => (
           <option key={organization.id} value={organization.id}>

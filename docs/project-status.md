@@ -1,6 +1,6 @@
 # FlowPlan repository status
 
-Last verified: 2026-09-11
+Last verified: 2026-09-12
 
 ## Release checkpoint
 
@@ -36,9 +36,36 @@ dependency installation and `git diff --check`. Backend/PostgreSQL suites were
 not rerun because their implementation and contracts are unchanged.
 
 See [UI refinement](ui-refinement.md) for scope and the manual acceptance checklist.
-No backend, API, realtime handler, schema or database behavior changed. Phase B
-has not begun. **PHASE A MANUAL UI ACCEPTANCE: PENDING.** V1 functional freeze
+No backend, API, realtime handler, schema or database behavior changed in Phase A.
+**PHASE A MANUAL UI ACCEPTANCE: PENDING.** V1 functional freeze
 remains reopened; automated component checks do not restore it.
+
+### UI refinement Phase B
+
+The persistent Project workspace is implemented with shared context and one
+Project subscription across Board, Docs, Files, Activity, Time, GitHub, Members,
+and Project settings routes. Resource panels reuse their existing APIs, query
+keys and mutation logic rather than opening independent feature dialogs.
+Project settings consolidates owner-only edit, duplicate and archive/restore;
+Column administration remains Board-local. The compact Projects list exposes
+Active/Archived as URL-backed navigation, including refresh/history recovery.
+
+Direct Project access no longer requires retained Organization membership:
+explicit Project access is still checked by the existing backend. Choosing
+another Organization leaves the current Project for its Project list.
+The shared layout removes protected content on denied Project refetch.
+Reconnect invalidation now includes Project Files, Docs and GitHub Issue caches.
+Docs drafts survive section navigation in account-scoped memory only; successful
+save/cancel and account changes clear them. Browser reload/close warns for dirty
+drafts; no durable draft storage or concurrency/versioning system was added.
+
+Frontend regression tests pass **67/67 in 9 suites**, including subscription
+lifecycle, authority, archives, legacy Task links, resource extraction and draft
+retention. TypeScript, ESLint, changed-file Prettier, production build and
+`git diff --check` pass; final verification details are in the UI refinement doc.
+No backend, API, database, dependency or Task/drag-and-drop contract changed.
+**PHASE B MANUAL UI ACCEPTANCE: PENDING. Phase C has not begun.**
+Functional freeze remains reopened until manual acceptance.
 
 ### Previous defect-closure verification
 

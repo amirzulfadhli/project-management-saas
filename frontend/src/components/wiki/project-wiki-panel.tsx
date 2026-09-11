@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -12,20 +12,16 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
-import { Modal } from "@/components/ui/modal";
+import { useWikiDrafts } from "./wiki-drafts";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 
 const CONTENT_LIMIT = 96 * 1024;
 
-export function ProjectWikiModal({
-  open,
-  onClose,
+export function ProjectWikiPanel({
   projectId,
   canAdminister,
 }: {
-  open: boolean;
-  onClose: () => void;
   projectId: string;
   canAdminister: boolean;
 }) {
@@ -33,29 +29,35 @@ export function ProjectWikiModal({
   const userId = session?.user.id ?? null;
   const queryClient = useQueryClient();
   const listKey = queryKeys.wikiPages(projectId, userId);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode, setMode] = useState<"view" | "edit" | "create">("view");
-  const [createParentId, setCreateParentId] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const drafts = useWikiDrafts();
+  const savedDraft = drafts.get(projectId);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    savedDraft?.selectedId ?? null,
+  );
+  const [mode, setMode] = useState<"view" | "edit" | "create">(
+    savedDraft?.mode ?? "view",
+  );
+  const [createParentId, setCreateParentId] = useState<string | null>(
+    savedDraft?.createParentId ?? null,
+  );
+  const [title, setTitle] = useState(savedDraft?.title ?? "");
+  const [content, setContent] = useState(savedDraft?.content ?? "");
   const [error, setError] = useState<string | null>(null);
 
   const pagesQuery = useQuery({
     queryKey: listKey,
     queryFn: () => api.getWikiPages(projectId),
-    enabled: open,
+    enabled: true,
   });
   const pages = useMemo(() => pagesQuery.data ?? [], [pagesQuery.data]);
-  const activePageId =
-    selectedId && pages.some((page) => page.id === selectedId)
-      ? selectedId
-      : (pages[0]?.id ?? null);
+  // Never retarget an editing draft to another page when its original disappears.
+  const activePageId = selectedId ?? pages[0]?.id ?? null;
   const selectedSummary =
     pages.find((page) => page.id === activePageId) ?? null;
   const pageQuery = useQuery({
     queryKey: queryKeys.wikiPage(projectId, activePageId ?? "none", userId),
     queryFn: () => api.getWikiPage(projectId, activePageId!),
-    enabled: open && Boolean(activePageId),
+    enabled: Boolean(activePageId),
   });
 
   const dirty =
@@ -63,15 +65,34 @@ export function ProjectWikiModal({
       ? Boolean(title || content)
       : mode === "edit" &&
         Boolean(
-          pageQuery.data &&
-          (title !== pageQuery.data.title ||
-            content !== pageQuery.data.content),
+          (savedDraft?.dirty && !pageQuery.data) ||
+          (pageQuery.data &&
+            (title !== pageQuery.data.title ||
+              content !== pageQuery.data.content)),
         );
   const confirmDiscard = () =>
     !dirty || window.confirm("Discard your unsaved documentation changes?");
-  const close = () => {
-    if (confirmDiscard()) onClose();
-  };
+  useEffect(() => {
+    if (mode === "view") drafts.delete(projectId);
+    else
+      drafts.set(projectId, {
+        selectedId: activePageId,
+        mode,
+        createParentId,
+        title,
+        content,
+        dirty,
+      });
+  }, [
+    drafts,
+    projectId,
+    activePageId,
+    mode,
+    createParentId,
+    title,
+    content,
+    dirty,
+  ]);
   const selectPage = (id: string) => {
     if (!confirmDiscard()) return;
     setMode("view");
@@ -104,6 +125,7 @@ export function ProjectWikiModal({
         parentId: createParentId,
       }),
     onSuccess: async (page) => {
+      drafts.delete(projectId);
       setMode("view");
       setSelectedId(page.id);
       setError(null);
@@ -118,6 +140,7 @@ export function ProjectWikiModal({
         content,
       }),
     onSuccess: async (page) => {
+      drafts.delete(projectId);
       queryClient.setQueryData(
         queryKeys.wikiPage(projectId, page.id, userId),
         page,
@@ -161,8 +184,14 @@ export function ProjectWikiModal({
     (canAdminister || selectedSummary?.createdById === userId);
 
   return (
-    <Modal open={open} onClose={close} title="Project documentation" size="xl">
-      <div className="grid max-h-[76vh] min-h-[32rem] grid-cols-1 gap-4 overflow-hidden md:grid-cols-[15rem_minmax(0,1fr)]">
+    <section aria-label="Project documentation">
+      {mode !== "view" && dirty ? (
+        <p role="status" className="mb-3 text-sm text-text-secondary">
+          Unsaved draft. It stays available during navigation in this session.
+          Save or cancel before leaving FlowPlan.
+        </p>
+      ) : null}
+      <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-[15rem_minmax(0,1fr)]">
         <aside className="flex min-h-0 flex-col rounded-lg border border-border bg-background/40 p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
@@ -206,7 +235,7 @@ export function ProjectWikiModal({
           </div>
         </aside>
 
-        <main className="min-h-0 overflow-y-auto pr-1">
+        <div className="min-w-0">
           {error ? (
             <p
               role="alert"
@@ -287,6 +316,7 @@ export function ProjectWikiModal({
                     onClick={() => {
                       setTitle(pageQuery.data.title);
                       setContent(pageQuery.data.content);
+                      setSelectedId(pageQuery.data.id);
                       setMode("edit");
                     }}
                   >
@@ -338,9 +368,9 @@ export function ProjectWikiModal({
               )}
             </article>
           )}
-        </main>
+        </div>
       </div>
-    </Modal>
+    </section>
   );
 }
 

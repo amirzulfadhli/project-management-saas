@@ -120,6 +120,25 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           exact: true,
         }),
         queryClient.invalidateQueries({
+          queryKey: queryKeys.projectAttachments(projectId, sessionUserId),
+          exact: true,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.wikiPages(projectId, sessionUserId),
+          exact: true,
+        }),
+        queryClient.invalidateQueries({
+          predicate: (query) =>
+            query.queryKey[0] === "wiki-page" &&
+            (query.queryKey[1] as { projectId?: string; userId?: string })
+              ?.projectId === projectId &&
+            (query.queryKey[1] as { userId?: string })?.userId ===
+              sessionUserId,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.githubIssueLists(projectId, sessionUserId),
+        }),
+        queryClient.invalidateQueries({
           queryKey: queryKeys.projectTime(projectId, sessionUserId ?? null),
           exact: true,
         }),

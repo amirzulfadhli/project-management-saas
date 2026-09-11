@@ -96,7 +96,14 @@ The originating browser may receive its own event. Realtime never inserts
 domain objects into cache; it only invalidates authoritative queries, so
 self-delivery cannot duplicate Tasks or Comments. On reconnect, the provider
 invalidates the subscribed Project scope, including Comment caches for Tasks
-already known in that Project.
+already known in that Project. Project Files, Docs list/detail and GitHub Issue
+lists are also invalidated within the current user/Project scope on reconnect.
+
+The shared Project route layout owns the subscription across Board, Docs, Files,
+Activity, Time, GitHub, Members and settings. Section navigation does not create
+additional sockets or release/rejoin the Project room. Leaving the Project
+releases the subscription. A denied Project refetch unmounts protected resource
+content, including when a prior snapshot is still cached.
 
 If the socket is unavailable, REST remains fully functional and the board shows
 a quiet refresh fallback message instead of blocking work or producing noisy

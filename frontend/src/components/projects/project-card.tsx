@@ -65,13 +65,15 @@ export function ProjectCard({
   };
 
   return (
-    <div className="group relative rounded-xl border border-border bg-surface p-4">
+    <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 p-4">
       <Link
         href={`/projects/${project.id}`}
-        className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="min-w-0 flex-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <div className="mb-1 flex items-start justify-between gap-2">
-          <h3 className="font-medium text-text-primary">{project.name}</h3>
+          <h3 className="min-w-0 break-words font-medium text-text-primary">
+            {project.name}
+          </h3>
           {archived ? <Badge tone="neutral">Archived</Badge> : null}
         </div>
         {project.description ? (
@@ -79,51 +81,59 @@ export function ProjectCard({
             {project.description}
           </p>
         ) : null}
-        <div className="flex items-center gap-2 text-xs text-text-secondary">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
           <span>{project.organization.name}</span>
           <span aria-hidden="true">·</span>
           <span>
             {project._count.tasks} task{project._count.tasks === 1 ? "" : "s"}
           </span>
           <span aria-hidden="true">·</span>
-          <span>{project._count.projectMembers} member(s)</span>
+          <span>{project._count.projectMembers} explicit member(s)</span>
         </div>
       </Link>
 
       {canAdminister ? (
-        <div className="mt-3 flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => duplicate.mutate()}
-            disabled={duplicate.isPending}
+        <details className="shrink-0 text-sm">
+          <summary
+            className="control-target cursor-pointer rounded-md px-3 py-2 hover:bg-hover"
+            aria-label={`Actions for ${project.name}`}
           >
-            {duplicate.isPending ? "Duplicating..." : "Duplicate"}
-          </Button>
-          {!archived ? (
+            Actions
+          </summary>
+          <div className="flex flex-wrap gap-1">
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleArchive}
-              disabled={archive.isPending}
+              onClick={() => duplicate.mutate()}
+              disabled={duplicate.isPending}
             >
-              {archive.isPending ? "Archiving..." : "Archive"}
+              {duplicate.isPending ? "Duplicating..." : "Duplicate"}
             </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => restore.mutate()}
-              disabled={restore.isPending}
-            >
-              {restore.isPending ? "Restoring..." : "Restore"}
-            </Button>
-          )}
-        </div>
+            {!archived ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleArchive}
+                disabled={archive.isPending}
+              >
+                {archive.isPending ? "Archiving..." : "Archive"}
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => restore.mutate()}
+                disabled={restore.isPending}
+              >
+                {restore.isPending ? "Restoring..." : "Restore"}
+              </Button>
+            )}
+          </div>
+        </details>
       ) : null}
 
       {actionError ? (
-        <p className="mt-2 text-xs text-danger" role="alert">
+        <p className="w-full text-sm text-danger" role="alert">
           {actionError instanceof ApiError
             ? actionError.message
             : "Project action failed."}

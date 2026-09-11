@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queries";
+import type { ProjectDetail } from "@/lib/types";
 import { AuthStatus } from "@/components/auth/auth-status";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { Icon } from "@/components/ui/icon";
@@ -15,6 +18,24 @@ export default function Header({
 }) {
   const pathname = usePathname();
   const isProject = pathname.startsWith("/projects/");
+  const projectId = isProject ? pathname.split("/")[2] : null;
+  // Observe the workspace's authorized cache; the global header never fetches Project data.
+  const project = useQuery<ProjectDetail>({
+    queryKey: queryKeys.project(projectId ?? "none"),
+    enabled: false,
+  });
+  const projectName =
+    !project.isError && projectId ? project.data?.name : undefined;
+  const sections: Record<string, string> = {
+    docs: "Docs",
+    files: "Files",
+    activity: "Activity",
+    time: "Time",
+    github: "GitHub",
+    members: "Members",
+    settings: "Project settings",
+  };
+  const section = sections[pathname.split("/")[3]] ?? "Board";
   const label =
     pathname === "/"
       ? "Home"
@@ -55,8 +76,16 @@ export default function Header({
               >
                 /
               </li>
-              <li aria-current="page" className="truncate font-medium">
-                Project
+              <li className="min-w-0 truncate font-medium">
+                <Link href={`/projects/${projectId}`}>
+                  {projectName ?? "Project"}
+                </Link>
+              </li>
+              <li aria-hidden="true" className="text-text-secondary">
+                /
+              </li>
+              <li aria-current="page" className="shrink-0 text-text-secondary">
+                {section}
               </li>
             </ol>
           ) : (

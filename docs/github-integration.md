@@ -159,12 +159,12 @@ are separate from Better Auth's optional `GITHUB_CLIENT_ID` and
 - pull request/branch linking and automation
 - background retries and durable webhook processing
 
-The callback returns a compact verified installation record. The Project modal
+The callback returns a compact verified installation record. The Project GitHub panel
 opens installation in a popup and polls the authenticated installation list;
 after the backend stores a new or updated installation, it closes the popup and
 continues to repository discovery. This avoids arbitrary return URLs and keeps
 the fixed callback contract. Blocked popups, cancellation, expiry, and callback
-failure are reported in the original Project modal.
+failure are reported in the Project GitHub section at `/projects/:id/github`.
 Authorization is verified when an installation is connected. Installation
 revocation/suspension events are not yet used to retire the local record.
 

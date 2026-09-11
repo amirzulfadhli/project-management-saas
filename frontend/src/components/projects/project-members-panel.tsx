@@ -11,13 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
-interface ProjectMembersModalProps {
-  open: boolean;
-  onClose: () => void;
+interface ProjectMembersPanelProps {
   projectId: string;
   organizationId: string;
 }
@@ -39,12 +36,10 @@ function mutationMessage(error: unknown, fallback: string): string {
   return error instanceof ApiError ? error.message : fallback;
 }
 
-export function ProjectMembersModal({
-  open,
-  onClose,
+export function ProjectMembersPanel({
   projectId,
   organizationId,
-}: ProjectMembersModalProps) {
+}: ProjectMembersPanelProps) {
   const queryClient = useQueryClient();
   const { selectedOrganization } = useOrganization();
   const { data: session } = authClient.useSession();
@@ -57,7 +52,7 @@ export function ProjectMembersModal({
   const membersQuery = useQuery({
     queryKey: membersKey,
     queryFn: () => api.getProjectMembers(projectId),
-    enabled: open && Boolean(projectId),
+    enabled: Boolean(projectId),
   });
 
   const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
@@ -206,8 +201,8 @@ export function ProjectMembersModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Project members">
-      <div className="max-h-[75vh] space-y-5 overflow-y-auto pr-1">
+    <section aria-label="Project members">
+      <div className="min-w-0 space-y-5">
         <p className="text-sm text-text-secondary">
           This roster records Project roles. Organization members may also have
           inherited Project access without appearing here.
@@ -406,6 +401,6 @@ export function ProjectMembersModal({
           </p>
         ) : null}
       </div>
-    </Modal>
+    </section>
   );
 }

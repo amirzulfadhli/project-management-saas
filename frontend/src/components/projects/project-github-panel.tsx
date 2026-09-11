@@ -15,15 +15,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
 const repositoryPageSize = 20;
 
-interface ProjectGithubModalProps {
-  open: boolean;
-  onClose: () => void;
+interface ProjectGithubPanelProps {
   projectId: string;
   canAdminister: boolean;
   columns: Column[];
@@ -62,14 +59,12 @@ function githubErrorMessage(error: unknown, fallback: string): string {
   return error.message || fallback;
 }
 
-export function ProjectGithubModal({
-  open,
-  onClose,
+export function ProjectGithubPanel({
   projectId,
   canAdminister,
   columns,
   currentUserId,
-}: ProjectGithubModalProps) {
+}: ProjectGithubPanelProps) {
   const queryClient = useQueryClient();
   const popupRef = useRef<Window | null>(null);
   const installationBaselineRef = useRef(new Map<string, string>());
@@ -84,7 +79,7 @@ export function ProjectGithubModal({
   const projectRepositoryQuery = useQuery({
     queryKey: projectRepositoryKey,
     queryFn: () => api.getProjectRepository(projectId),
-    enabled: open && Boolean(projectId),
+    enabled: Boolean(projectId),
   });
   const isDisconnected =
     projectRepositoryQuery.isSuccess && !projectRepositoryQuery.data;
@@ -92,7 +87,7 @@ export function ProjectGithubModal({
   const installationsQuery = useQuery({
     queryKey: queryKeys.githubInstallations,
     queryFn: api.getGithubInstallations,
-    enabled: open && canAdminister && isDisconnected,
+    enabled: canAdminister && isDisconnected,
     refetchInterval: installFlowPending ? 2_000 : false,
   });
   const installations = installationsQuery.data ?? [];
@@ -178,8 +173,7 @@ export function ProjectGithubModal({
         page: repositoryPage,
         perPage: repositoryPageSize,
       }),
-    enabled:
-      open && canAdminister && isDisconnected && Boolean(activeInstallationId),
+    enabled: canAdminister && isDisconnected && Boolean(activeInstallationId),
   });
 
   const installGithubApp = useMutation({
@@ -290,8 +284,8 @@ export function ProjectGithubModal({
     disconnectRepository.isPending;
 
   return (
-    <Modal open={open} onClose={onClose} title="GitHub integration" size="lg">
-      <div className="max-h-[75vh] space-y-5 overflow-y-auto pr-1">
+    <section aria-label="GitHub integration">
+      <div className="min-w-0 space-y-5">
         {projectRepositoryQuery.isPending ? (
           <LoadingMessage>Loading GitHub connection...</LoadingMessage>
         ) : projectRepositoryQuery.isError ? (
@@ -435,7 +429,7 @@ export function ProjectGithubModal({
           </p>
         ) : null}
       </div>
-    </Modal>
+    </section>
   );
 }
 

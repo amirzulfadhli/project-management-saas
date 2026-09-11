@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/queries";
@@ -14,8 +16,15 @@ import { useOrganization } from "@/components/organizations/organization-provide
 import { authClient } from "@/lib/auth-client";
 
 export default function ProjectsPage() {
+  return (
+    <Suspense fallback={<p role="status">Loading Projects…</p>}>
+      <ProjectsContent />
+    </Suspense>
+  );
+}
+function ProjectsContent() {
   const [createOpen, setCreateOpen] = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
+  const showArchived = useSearchParams().get("view") === "archived";
   const [notice, setNotice] = useState<{
     organizationId: string;
     message: string;
@@ -41,9 +50,7 @@ export default function ProjectsPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">
-            {showArchived ? "Archived Projects" : "Active Projects"}
-          </h1>
+          <h1 className="text-2xl font-bold text-text-primary">Projects</h1>
           <p className="text-sm text-text-secondary">
             {selectedOrganization
               ? `Projects in ${selectedOrganization.name}.`
@@ -51,30 +58,21 @@ export default function ProjectsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div
-            className="flex items-center rounded-md border border-border bg-surface p-1"
-            role="group"
+          <nav
             aria-label="Project archive view"
+            className="flex border-b border-border"
           >
-            <Button
-              size="sm"
-              variant={showArchived ? "ghost" : "primary"}
-              aria-pressed={!showArchived}
-              onClick={() => setShowArchived(false)}
-              disabled={!selectedOrganizationId}
-            >
-              Active
-            </Button>
-            <Button
-              size="sm"
-              variant={showArchived ? "primary" : "ghost"}
-              aria-pressed={showArchived}
-              onClick={() => setShowArchived(true)}
-              disabled={!selectedOrganizationId}
-            >
-              Archived
-            </Button>
-          </div>
+            {[false, true].map((archived) => (
+              <Link
+                key={String(archived)}
+                href={archived ? "/projects?view=archived" : "/projects"}
+                aria-current={showArchived === archived ? "page" : undefined}
+                className={`control-target inline-flex items-center border-b-2 px-4 text-sm font-medium ${showArchived === archived ? "border-primary text-primary" : "border-transparent text-text-secondary hover:bg-hover"}`}
+              >
+                {archived ? "Archived" : "Active"}
+              </Link>
+            ))}
+          </nav>
           {!showArchived ? (
             <Button
               onClick={() => setCreateOpen(true)}
@@ -95,7 +93,12 @@ export default function ProjectsPage() {
         </div>
       ) : null}
 
-      {!selectedOrganizationId || projects.isPending ? (
+      {!selectedOrganizationId ? (
+        <EmptyState
+          title="Select an organization"
+          description="Choose an Organization in the sidebar to browse its Projects."
+        />
+      ) : projects.isPending ? (
         <div className="flex items-center justify-center gap-2 py-16 text-text-secondary">
           <Spinner /> Loading projects...
         </div>
@@ -109,7 +112,7 @@ export default function ProjectsPage() {
           onRetry={() => projects.refetch()}
         />
       ) : projects.data && projects.data.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="divide-y divide-border rounded-lg border border-border bg-surface">
           {projects.data.map((project) => (
             <ProjectCard
               key={project.id}
@@ -156,6 +159,7 @@ export default function ProjectsPage() {
       )}
 
       <CreateProjectModal
+        key={selectedOrganizationId}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
       />

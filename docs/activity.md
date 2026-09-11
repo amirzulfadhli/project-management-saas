@@ -88,8 +88,8 @@ reference. The `(projectId, createdAt, id)` index supports this access path.
 
 ## Frontend activity feed
 
-Project detail exposes Activity through a compact header action and modal rather
-than adding a permanent dashboard panel. The modal uses the Project-scoped
+Project detail exposes Activity through its persistent `/projects/:id/activity`
+section rather than a feature dialog. The panel uses the Project-scoped
 `["project-activities", { projectId }]` infinite-query key, loads 30 newest
 events at a time, and offers an explicit **Load more** action. Loaded pages are
 deduplicated while retaining the backend's newest-first order.

@@ -41,6 +41,6 @@ After commit the controller publishes compact `WIKI_PAGE_CREATED`, `WIKI_PAGE_UP
 
 ## Frontend and limitations
 
-The Project header's **Docs** action opens a responsive modal with page tree and selected page. It supports root/child creation, safe parent moves, Markdown reading, explicit edit/save/cancel, creator/owner deletion controls, and loading/empty/error states. Dirty editor state requires confirmation before page selection, cancel, or modal close.
+The Project's **Docs** section at `/projects/:id/docs` contains the existing page tree and editor. It supports root/child creation, safe parent moves, Markdown reading, explicit edit/save/cancel, creator/owner deletion controls, and loading/empty/error states. Dirty editor state requires confirmation before page selection or Cancel. Account-scoped React memory retains unsaved drafts across route navigation; a native before-unload warning covers dirty reload/close. Save/cancel clears drafts, and signing out or switching accounts discards them. No draft is stored in browser storage or on the server. See [UI refinement](ui-refinement.md) for the manual acceptance gate.
 
 Query keys include Project, page, and current-user scope. Concurrent saves use last-committed-write semantics; this is not live character-level collaboration. Rich text, CRDTs, version history, Wiki comments/notifications, public sharing, search, AI, tree drag-and-drop, stable inline attachment embedding, and browser acceptance remain deferred.

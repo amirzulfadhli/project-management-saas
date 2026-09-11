@@ -1,13 +1,26 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render as renderDom,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import MainLayout from "@/components/layout/MainLayout";
 import { AuthStatus } from "@/components/auth/auth-status";
 import { authClient } from "@/lib/auth-client";
+import { queryKeys } from "@/lib/queries";
+import { projectFixture } from "./project-fixtures";
 
 let mockPathname = "/projects/project-1";
-const mockRouter = { replace: jest.fn(), refresh: jest.fn() };
+const mockRouter = { replace: jest.fn(), refresh: jest.fn(), push: jest.fn() };
+function render(ui: ReactNode) {
+  return renderDom(
+    <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>,
+  );
+}
 const mockSelectOrganization = jest.fn();
 let mockOrganization: { id: string; name: string } | null = {
   id: "org-1",
@@ -78,6 +91,7 @@ test("organization selection reuses the existing provider callback", () => {
     { target: { value: "org-2" } },
   );
   expect(mockSelectOrganization).toHaveBeenCalledWith("org-2");
+  expect(mockRouter.push).toHaveBeenCalledWith("/projects");
 });
 
 test("member entry does not invent access when no organization exists", () => {
@@ -102,6 +116,35 @@ test("header exposes navigation, notifications and account without duplicate swi
   expect(open).toHaveBeenCalledTimes(1);
   expect(screen.getByRole("button", { name: "Notifications" })).toBeTruthy();
   expect(screen.queryByRole("combobox")).toBeNull();
+});
+
+test("header observes authoritative Project identity and section without starting a fetch", () => {
+  const client = new QueryClient();
+  client.setQueryData(queryKeys.project("project-a"), projectFixture);
+  mockPathname = "/projects/project-a/docs";
+  renderDom(
+    <QueryClientProvider client={client}>
+      <Header onOpenNavigation={() => undefined} navigationOpen={false} />
+    </QueryClientProvider>,
+  );
+  expect(
+    screen.getByRole("link", { name: "FlowPlan" }).getAttribute("href"),
+  ).toBe("/projects/project-a");
+  expect(screen.getByText("Docs").getAttribute("aria-current")).toBe("page");
+  expect(client.isFetching()).toBe(0);
+});
+
+test("header never uses an unrelated Project's cached identity", () => {
+  const client = new QueryClient();
+  client.setQueryData(queryKeys.project("project-a"), projectFixture);
+  mockPathname = "/projects/project-b/files";
+  renderDom(
+    <QueryClientProvider client={client}>
+      <Header onOpenNavigation={() => undefined} navigationOpen={false} />
+    </QueryClientProvider>,
+  );
+  expect(screen.queryByText("FlowPlan")).toBeNull();
+  expect(screen.getByText("Files")).toBeTruthy();
 });
 
 test("shell provides skip target and reuses selected organization membership surface", () => {

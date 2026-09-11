@@ -6,7 +6,7 @@ Status: **FILES & ATTACHMENTS CORE — BACKEND + FRONTEND is complete for automa
 
 FlowPlan supports private attachments at two scopes:
 
-- Project attachments are listed from the Project header **Files** dialog.
+- Project attachments are listed in the **Files** section at `/projects/:id/files`.
 - Task attachments are listed from the existing Task dialog's **Attachments** tab.
 
 There are no public links, folders, versions, thumbnails, rich document tools,
@@ -135,7 +135,7 @@ Attachments intentionally create no Notifications.
 
 ## Frontend and verification status
 
-Both attachment surfaces reuse the existing modal, button, empty/error, and
+The Project Files page and Task attachment surface reuse the existing button, empty/error, and
 TanStack Query patterns. They provide upload pending state, deterministic
 pagination, authorized delete confirmation, authenticated download, compact
 metadata, and narrow-layout-safe rows. Project and Task query keys include the

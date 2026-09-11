@@ -13,7 +13,6 @@ import type { ActivityItem } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
 
 const categoryClasses: Record<ActivityCategory, string> = {
@@ -24,15 +23,7 @@ const categoryClasses: Record<ActivityCategory, string> = {
   integration: "bg-primary",
 };
 
-export function ProjectActivityModal({
-  open,
-  onClose,
-  projectId,
-}: {
-  open: boolean;
-  onClose: () => void;
-  projectId: string;
-}) {
+export function ProjectActivityPanel({ projectId }: { projectId: string }) {
   const activityQuery = useInfiniteQuery({
     queryKey: queryKeys.projectActivities(projectId),
     queryFn: ({ pageParam }) =>
@@ -42,7 +33,7 @@ export function ProjectActivityModal({
       }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: open && Boolean(projectId),
+    enabled: Boolean(projectId),
   });
 
   const activities = useMemo(() => {
@@ -58,8 +49,8 @@ export function ProjectActivityModal({
   );
 
   return (
-    <Modal open={open} onClose={onClose} title="Project activity" size="lg">
-      <div className="max-h-[72vh] overflow-y-auto pr-1">
+    <section aria-label="Project activity">
+      <div className="min-w-0 space-y-5">
         {activityQuery.isPending ? (
           <div
             className="flex items-center justify-center gap-2 py-12 text-sm text-text-secondary"
@@ -119,7 +110,7 @@ export function ProjectActivityModal({
           </>
         )}
       </div>
-    </Modal>
+    </section>
   );
 }
 

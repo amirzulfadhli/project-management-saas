@@ -1,8 +1,9 @@
-# UI refinement — Phase A
+# UI refinement — Phases A and B
 
 Phase A implements the approved shell, navigation, spacing and interaction
-foundation only. Project section routes, Task-detail redesign and resource
-extraction (Phase B onward) have **not** started.
+foundation. Phase B adds the persistent Project workspace described below.
+Task-detail/Board redesign (Phase C) and resource-experience refinement (Phase D)
+have **not** started.
 
 ## Implemented
 
@@ -84,3 +85,103 @@ not rerun for this presentation-only phase.
 
 No manual acceptance or restored functional freeze is claimed by automated
 verification. Broader V1 QA and external HTTPS/GitHub/deployment gates remain.
+
+## Phase B — Persistent Project workspace
+
+The shared `/projects/[id]/layout.tsx` loads the existing authorized Project
+snapshot and owns `useProjectRealtime`. Its Project ID key resets local state
+when changing Projects; navigation between sections retains the same subscription.
+The session-bound Socket.IO provider, envelopes and backend authorization are
+unchanged. Project access errors unmount all protected section content and
+unsubscribe, even when a previously successful snapshot remains cached.
+
+| Destination      | Route                    | Implementation                                     |
+| ---------------- | ------------------------ | -------------------------------------------------- |
+| Board            | `/projects/:id`          | Existing Kanban, Task dialog and `?task=` links    |
+| Docs             | `/projects/:id/docs`     | Extracted Markdown/tree/editor panel               |
+| Files            | `/projects/:id/files`    | Existing Project-scoped AttachmentsPanel           |
+| Activity         | `/projects/:id/activity` | Extracted cursor-paginated feed                    |
+| Time             | `/projects/:id/time`     | Existing totals and authorized breakdown           |
+| GitHub           | `/projects/:id/github`   | Existing connection/discovery/import workflows     |
+| Members          | `/projects/:id/members`  | Existing explicit roster and owner controls        |
+| Project settings | `/projects/:id/settings` | Existing owner-only edit/duplicate/archive/restore |
+
+The persistent header identifies the Project and Organization, preserves the
+archive badge, and separates Members/settings from everyday section navigation.
+Short descriptions remain visible; longer descriptions expand. Section links use
+real URLs and native navigation/history, with horizontal overflow and active-link
+visibility on narrow screens. Global breadcrumbs observe only the matching
+Project cache and never initiate another Project fetch.
+
+The Projects surface uses one compact list, not a new view system. Active and
+Archived are links (`/projects` and `/projects?view=archived`) mapped to the
+existing scoped list API. Owner quick actions remain available under each row's
+Actions disclosure. Restore remains owner-only. Archiving from settings returns
+to the archived list. Duplication copies existing Project/Board structure and
+makes the caller its owner; it does not copy source members, Tasks, resource
+history, time or external identities.
+
+### Preserved access and cache boundaries
+
+- Explicit Project membership can outlive Organization membership. The
+  Organization setup gate now permits direct Project routes, without bypassing
+  Project REST authorization or granting administrative authority.
+- An explicit Organization switch navigates to Projects; it no longer competes
+  with the Project layout's automatic adoption of a selectable Organization.
+- Resource queries mount only for the selected section. Shared Project,
+  membership and Column snapshots support the workspace; Task lists remain
+  Board-local. No per-card resource queries or new endpoints were added.
+- Resource query keys, paging, write payloads, file security, Markdown rendering,
+  timer privacy and GitHub installation/token handling are unchanged.
+- Reconnect invalidation additionally covers that user's Project attachments,
+  Docs list/detail and GitHub Issue lists. Membership events still refresh
+  authoritative shared permissions, and revocation triggers REST reauthorization.
+- Members remain an explicit roster, not a claim to enumerate all inherited
+  collaborators. Frontend controls remain UX, never the security boundary.
+
+### Docs draft lifecycle
+
+Extracting Docs from its modal would otherwise lose drafts on section navigation.
+Its small account-keyed React-memory store retains editor identity, title and
+Markdown when the route unmounts. Returning restores the draft; page selection
+and Cancel still require discard confirmation. Successful saves clear stored
+drafts, including when their response arrives after route unmount. A deleted
+page never silently retargets an editing draft to a sibling.
+
+Dirty drafts register a native before-unload warning. Drafts are **not** written
+to localStorage, sessionStorage, the query cache or the backend. Reloading/closing
+after accepting that warning, signing out or switching accounts discards them.
+This is navigation protection, not durable recovery or optimistic concurrency.
+Wiki saves retain the existing last-committed-write behavior.
+
+### Phase B verification and manual gate
+
+Final automated results: **67/67 frontend tests in 9 suites** pass. After
+correcting the Time-summary fixture's required fields and removing an unsupported
+Testing Library query option, the affected resource suite also passes **12/12**,
+TypeScript passes, and the Next.js production build passes with the local
+`NEXT_PUBLIC_API_URL=http://localhost:3001`. ESLint, changed-file Prettier and
+`git diff --check` pass. No dependency installation, database mutation or
+backend/PostgreSQL regression rerun was needed for this phase.
+
+Automated coverage includes persistent sections/subscriptions, owner and ordinary
+member controls, retained explicit access, final access revocation, archive/list
+scoping, restore, duplication, legacy Task links/deletion, inline resource loading,
+GitHub non-owner restrictions, reconnect isolation, breadcrumbs and Docs drafts.
+No backend/schema/API changes require PostgreSQL reruns for this frontend phase.
+
+Manual acceptance is still required for:
+
+- Every section via direct URL, refresh, Back/Forward and cross-Project navigation.
+- Active/Archived restoration, owner actions, explicit-only access and two-user
+  membership changes/revocation on both Board and resource pages.
+- Reconnect while viewing Docs, Files, Activity, Time and GitHub.
+- Docs dirty navigation, Cancel, remote deletion and browser unload warnings.
+- Project names/descriptions, section overflow, Actions disclosure, native focus
+  behavior and full workflows at desktop and approximately 390px.
+- Existing pointer/keyboard/touch drag, Task dialogs, attachment transfers,
+  timer operations, notifications and GitHub mock/local flows.
+
+No browser automation or manual acceptance was performed. Live GitHub remains
+blocked on public HTTPS/live App credentials. Deployment remains outside scope.
+Phase C is not started; V1 functional freeze is not restored.

@@ -7,29 +7,20 @@ import { queryKeys } from "@/lib/queries";
 import { formatDuration } from "@/lib/format";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
-import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
 
-export function ProjectTimeModal({
-  open,
-  onClose,
-  projectId,
-}: {
-  open: boolean;
-  onClose: () => void;
-  projectId: string;
-}) {
+export function ProjectTimePanel({ projectId }: { projectId: string }) {
   const { data: session } = authClient.useSession();
   const userId = session?.user.id ?? null;
   const summary = useQuery({
     queryKey: queryKeys.projectTime(projectId, userId),
     queryFn: () => api.getProjectTime(projectId),
-    enabled: open,
+    enabled: true,
   });
 
   return (
-    <Modal open={open} onClose={onClose} title="Project time" size="lg">
-      <div className="max-h-[72vh] space-y-5 overflow-y-auto pr-1">
+    <section aria-label="Project time">
+      <div className="min-w-0 space-y-5">
         {summary.isPending ? (
           <div className="flex items-center justify-center gap-2 py-12 text-text-secondary">
             <Spinner /> Loading time...
@@ -109,7 +100,7 @@ export function ProjectTimeModal({
           </>
         )}
       </div>
-    </Modal>
+    </section>
   );
 }
 

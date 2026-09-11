@@ -10,6 +10,7 @@ import {
 } from "@/components/organizations/organization-provider";
 import { OrganizationMembersModal } from "@/components/organizations/organization-members-modal";
 import { Modal } from "@/components/ui/modal";
+import { WikiDraftProvider } from "@/components/wiki/wiki-drafts";
 
 export default function MainLayout({
   children,
@@ -17,9 +18,11 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <OrganizationProvider>
-      <Shell>{children}</Shell>
-    </OrganizationProvider>
+    <WikiDraftProvider>
+      <OrganizationProvider>
+        <Shell>{children}</Shell>
+      </OrganizationProvider>
+    </WikiDraftProvider>
   );
 }
 

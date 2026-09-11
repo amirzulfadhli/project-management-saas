@@ -33,6 +33,9 @@ const OrganizationContext = createContext<OrganizationContextValue | null>(
 export function OrganizationProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  // Explicit Project membership can survive loss of Organization membership.
+  // Project access is established independently by its authenticated API.
+  const directProjectRoute = /^\/projects\/[^/]+/.test(pathname);
   const [storedSelection, setStoredSelection] = useState<string | null>(() =>
     typeof window === "undefined"
       ? null
@@ -53,12 +56,14 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     if (
       organizationsQuery.isSuccess &&
       organizations.length === 0 &&
+      !directProjectRoute &&
       pathname !== "/organizations"
     ) {
       router.replace("/organizations");
     }
   }, [
     organizations.length,
+    directProjectRoute,
     organizationsQuery.isSuccess,
     pathname,
     router,
@@ -97,13 +102,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     enabled: Boolean(selectedOrganizationId),
   });
 
-  const selectOrganization = useCallback(
-    (organizationId: string) => {
-      setStoredSelection(organizationId);
-      localStorage.setItem(selectedOrganizationStorageKey, organizationId);
-    },
-    [],
-  );
+  const selectOrganization = useCallback((organizationId: string) => {
+    setStoredSelection(organizationId);
+    localStorage.setItem(selectedOrganizationStorageKey, organizationId);
+  }, []);
 
   if (organizationsQuery.isPending) {
     return <OrganizationLoadingState message="Loading your organizations…" />;
@@ -126,7 +128,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  if (organizations.length === 0 && pathname !== "/organizations") {
+  if (
+    organizations.length === 0 &&
+    !directProjectRoute &&
+    pathname !== "/organizations"
+  ) {
     return <OrganizationLoadingState message="Opening organization setup…" />;
   }
 
@@ -141,6 +147,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   if (
     selectedOrganizationId &&
     selectedOrganizationQuery.isPending &&
+    !directProjectRoute &&
     pathname !== "/organizations"
   ) {
     return <OrganizationLoadingState message="Opening your workspace…" />;
@@ -149,6 +156,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   if (
     selectedOrganizationId &&
     selectedOrganizationQuery.isError &&
+    !directProjectRoute &&
     pathname !== "/organizations"
   ) {
     return (
@@ -167,12 +175,13 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  const selectedOrganization =
-    selectedOrganizationQuery.data ??
-    organizations.find(
-      (organization) => organization.id === selectedOrganizationId,
-    ) ??
-    null;
+  const selectedOrganization = selectedOrganizationQuery.isError
+    ? null
+    : (selectedOrganizationQuery.data ??
+      organizations.find(
+        (organization) => organization.id === selectedOrganizationId,
+      ) ??
+      null);
 
   return (
     <OrganizationContext.Provider
