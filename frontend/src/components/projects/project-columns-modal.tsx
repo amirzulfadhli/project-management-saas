@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/queries";
@@ -16,6 +16,7 @@ interface ProjectColumnsModalProps {
   open: boolean;
   onClose: () => void;
   projectId: string;
+  focusColumnId?: string;
 }
 
 interface RenameColumnInput {
@@ -61,6 +62,7 @@ export function ProjectColumnsModal({
   open,
   onClose,
   projectId,
+  focusColumnId,
 }: ProjectColumnsModalProps) {
   const queryClient = useQueryClient();
   const [newName, setNewName] = useState("");
@@ -76,6 +78,12 @@ export function ProjectColumnsModal({
     enabled: open && Boolean(projectId),
   });
   const columns = columnsQuery.data ?? [];
+  useEffect(() => {
+    if (focusColumnId && columnsQuery.isSuccess)
+      document
+        .getElementById(`manage-column-${focusColumnId}`)
+        ?.scrollIntoView?.({ block: "nearest" });
+  }, [focusColumnId, columnsQuery.isSuccess]);
 
   const refreshProjectCaches = async () => {
     await Promise.all([
@@ -205,7 +213,11 @@ export function ProjectColumnsModal({
                 {columns.map((column) => {
                   const isEditing = editingColumnId === column.id;
                   return (
-                    <li key={column.id} className="px-3 py-3">
+                    <li
+                      key={column.id}
+                      id={`manage-column-${column.id}`}
+                      className="px-3 py-3"
+                    >
                       {isEditing ? (
                         <form
                           className="space-y-3"

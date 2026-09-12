@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { taskHref } from "@/lib/task-links";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/queries";
@@ -25,6 +26,12 @@ export function TaskRow({
   const remove = useMutation({
     mutationFn: () => api.deleteTask(task.id),
     onSuccess: async () => {
+      const detailScope = [
+        "task-detail",
+        { projectId: task.projectId, taskId: task.id },
+      ];
+      await queryClient.cancelQueries({ queryKey: detailScope });
+      queryClient.setQueriesData({ queryKey: detailScope }, null);
       queryClient.setQueryData<Task[]>(listKey, (current) =>
         current?.filter((item) => item.id !== task.id),
       );
@@ -62,7 +69,7 @@ export function TaskRow({
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <Link
-            href={`/projects/${task.projectId}?task=${task.id}`}
+            href={taskHref(task.projectId, task.id)}
             className="block truncate text-sm font-medium text-text-primary hover:text-primary"
             aria-label={`Open Task ${task.title}`}
           >

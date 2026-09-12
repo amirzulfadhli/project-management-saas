@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { taskHref } from "@/lib/task-links";
 import { ApiError } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { Spinner } from "@/components/ui/spinner";
@@ -107,7 +108,7 @@ export default function DashboardPage() {
                   {scheduledTasks.slice(0, 5).map((task) => (
                     <Link
                       key={task.id}
-                      href={`/projects/${task.projectId}`}
+                      href={taskHref(task.projectId, task.id)}
                       className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3 hover:bg-hover"
                     >
                       <div className="min-w-0">

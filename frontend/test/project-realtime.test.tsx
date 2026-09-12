@@ -64,12 +64,19 @@ test("reconnect refreshes mounted resource scopes without touching unrelated Pro
   const view = setup();
   await screen.findByText("Private Docs");
   const ownKeys = [
+    queryKeys.task("project-a", "task-a", "user-a"),
+    queryKeys.taskComments("task-a"),
+    queryKeys.taskAttachments("task-a", "user-a"),
+    queryKeys.taskGithubIssue("task-a", "user-a"),
+    queryKeys.taskTime("task-a", "user-a"),
     queryKeys.projectAttachments("project-a", "user-a"),
     queryKeys.wikiPages("project-a", "user-a"),
     queryKeys.wikiPage("project-a", "wiki-a", "user-a"),
     queryKeys.githubIssues("project-a", 1, 20, "open", "user-a"),
   ];
   const otherKeys = [
+    queryKeys.task("other-project", "task-b", "user-a"),
+    queryKeys.task("project-a", "task-a", "other-user"),
     queryKeys.wikiPage("other-project", "wiki-b", "user-a"),
     queryKeys.wikiPage("project-a", "wiki-c", "other-user"),
   ];
@@ -80,6 +87,49 @@ test("reconnect refreshes mounted resource scopes without touching unrelated Pro
     expect(view.client.getQueryState(key)?.isInvalidated).toBe(true);
   for (const key of otherKeys)
     expect(view.client.getQueryState(key)?.isInvalidated).toBe(false);
+});
+
+test("Task events reconcile only the matching detail, and deletion cancels an in-flight fetch", async () => {
+  const view = setup();
+  await screen.findByText("Private Docs");
+  const key = queryKeys.task("project-a", "task-a", "user-a");
+  const other = queryKeys.task("project-a", "task-b", "user-a");
+  view.client.setQueryData(key, { title: "Old" });
+  view.client.setQueryData(other, { title: "Other" });
+  await act(async () =>
+    mockHandlers.get("project:event")?.({
+      entity: "task",
+      type: "TASK_UPDATED",
+      projectId: "project-a",
+      taskId: "task-a",
+    }),
+  );
+  expect(view.client.getQueryState(key)?.isInvalidated).toBe(true);
+  expect(view.client.getQueryState(other)?.isInvalidated).toBe(false);
+  let resolve!: (value: unknown) => void;
+  const pending = view.client
+    .fetchQuery({
+      queryKey: key,
+      queryFn: () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    })
+    .catch(() => undefined);
+  await act(async () =>
+    mockHandlers.get("project:event")?.({
+      entity: "task",
+      type: "TASK_DELETED",
+      projectId: "project-a",
+      taskId: "task-a",
+    }),
+  );
+  expect(view.client.getQueryData(key)).toBeNull();
+  await act(async () => {
+    resolve({ title: "Do not resurrect" });
+    await pending;
+  });
+  expect(view.client.getQueryData(key)).toBeNull();
 });
 test("member events reconcile shared permissions and final access revocation hides resources", async () => {
   const view = setup();

@@ -71,9 +71,10 @@ No notes or durations are broadcast. The frontend invalidates only the
 affected user's active-timer cache, affected Task time cache, and Project time
 summary. Realtime failure never prevents REST persistence.
 
-The existing Task dialog has an explicit **Time tracking** tab for totals,
-start/stop, manual entry, and the caller's recent history. Task links from the
-top-level Tasks page preserve Task identity and open this same dialog. The
+Task detail now shows totals and Start/Stop immediately. Manual entry and the
+caller's recent history remain available under a disclosure; plain manual inputs
+survive route navigation in session memory. Task links use canonical detail routes,
+and Project per-Task totals link to the exact Task. The
 Project **Time** section at `/projects/:id/time` exposes total, caller
 contribution, per-Task totals, and owner-only collaborator totals. Manual
 browser retesting remains required after the first V1 QA defect-closure pass.

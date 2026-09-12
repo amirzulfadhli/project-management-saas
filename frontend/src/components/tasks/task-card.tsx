@@ -19,11 +19,12 @@ export function TaskCard({
     <article className="group relative">
       <button
         type="button"
+        aria-label={`Open Task ${task.title}`}
         onClick={onClick}
         className={`w-full rounded-md border border-border bg-surface p-3 text-left transition-colors hover:border-border hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${dragHandle ? "pl-[52px]" : ""}`}
       >
         <div className="mb-1.5 flex items-start justify-between gap-2">
-          <span className="text-sm font-medium text-text-primary">
+          <span className="break-words text-sm font-medium text-text-primary">
             {task.title}
           </span>
           <Badge tone={priorityTone(task.priority)}>

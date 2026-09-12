@@ -32,6 +32,7 @@ interface ProjectKanbanProps {
   tasks: Task[];
   onOpenTask: (task: Task) => void;
   onCreateTask: (columnId: string) => void;
+  onManageColumn?: (columnId: string) => void;
 }
 
 interface MoveVariables extends MoveTaskInput {
@@ -49,6 +50,7 @@ export function ProjectKanban({
   tasks,
   onOpenTask,
   onCreateTask,
+  onManageColumn,
 }: ProjectKanbanProps) {
   const queryClient = useQueryClient();
   const tasksKey = queryKeys.tasks(projectId);
@@ -211,7 +213,12 @@ export function ProjectKanban({
         onDragCancel={() => setActiveTaskId(null)}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex-1 overflow-x-auto">
+        <div
+          className="flex-1 overflow-x-auto"
+          role="region"
+          aria-label="Task Board"
+          tabIndex={0}
+        >
           <div className="flex min-h-full items-start gap-3 pb-2">
             {columns.map((column) => (
               <KanbanColumn
@@ -221,6 +228,7 @@ export function ProjectKanban({
                 disabled={moveTask.isPending}
                 onOpenTask={onOpenTask}
                 onCreateTask={onCreateTask}
+                onManageColumn={onManageColumn}
               />
             ))}
           </div>
@@ -243,12 +251,14 @@ function KanbanColumn({
   disabled,
   onOpenTask,
   onCreateTask,
+  onManageColumn,
 }: {
   column: Column;
   tasks: Task[];
   disabled: boolean;
   onOpenTask: (task: Task) => void;
   onCreateTask: (columnId: string) => void;
+  onManageColumn?: (columnId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `column:${column.id}`,
@@ -265,10 +275,22 @@ function KanbanColumn({
       }`}
     >
       <div className="mb-2 flex items-center justify-between px-1">
-        <h2 className="text-sm font-semibold text-text-primary">
+        <h2 className="min-w-0 break-words text-sm font-semibold text-text-primary">
           {column.name}
         </h2>
-        <span className="text-xs text-text-secondary">{tasks.length}</span>
+        <div className="flex shrink-0 items-center gap-1">
+          <span className="text-xs text-text-secondary">{tasks.length}</span>
+          {onManageColumn && (
+            <button
+              type="button"
+              className="icon-control text-text-secondary hover:bg-hover"
+              aria-label={`Manage ${column.name} Column`}
+              onClick={() => onManageColumn(column.id)}
+            >
+              …
+            </button>
+          )}
+        </div>
       </div>
       <SortableContext
         items={tasks.map((task) => task.id)}
@@ -277,7 +299,7 @@ function KanbanColumn({
         <div className="flex min-h-12 flex-1 flex-col gap-2">
           {tasks.length === 0 ? (
             <p className="rounded-md border border-dashed border-border px-3 py-4 text-center text-xs text-text-secondary">
-              Drop a Task here
+              No Tasks. Add one below or drop a Task here
             </p>
           ) : (
             tasks.map((task) => (

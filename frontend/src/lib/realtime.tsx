@@ -97,7 +97,26 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         for (const task of tasks ?? []) taskIds.add(task.id);
       }
 
+      for (const [key] of queryClient.getQueriesData({
+        queryKey: ["task-detail", { projectId, userId: sessionUserId }],
+      })) {
+        const identity = key[1] as { taskId: string };
+        taskIds.add(identity.taskId);
+      }
       await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["task-detail", { projectId, userId: sessionUserId }],
+        }),
+        ...[...taskIds].flatMap((taskId) => [
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.taskAttachments(taskId, sessionUserId),
+            exact: true,
+          }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.taskGithubIssue(taskId, sessionUserId),
+            exact: true,
+          }),
+        ]),
         queryClient.invalidateQueries({
           queryKey: queryKeys.project(projectId),
           exact: true,
@@ -238,7 +257,27 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           ]);
           break;
         case "task":
+          if (event.taskId && event.type !== realtimeEventTypes.TASK_DELETED) {
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.task(
+                event.projectId,
+                event.taskId,
+                sessionUserId ?? null,
+              ),
+              exact: true,
+            });
+          }
           if (event.type === realtimeEventTypes.TASK_DELETED && event.taskId) {
+            const detailKey = queryKeys.task(
+              event.projectId,
+              event.taskId,
+              sessionUserId ?? null,
+            );
+            void queryClient.cancelQueries({
+              queryKey: detailKey,
+              exact: true,
+            });
+            queryClient.setQueryData(detailKey, null);
             queryClient.setQueriesData<Task[]>(
               { queryKey: queryKeys.tasks(event.projectId) },
               (current) => current?.filter((task) => task.id !== event.taskId),
@@ -305,6 +344,15 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           ]);
           break;
         case "github-issue":
+          if (event.taskId)
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.task(
+                event.projectId,
+                event.taskId,
+                sessionUserId ?? null,
+              ),
+              exact: true,
+            });
           void Promise.all([
             queryClient.invalidateQueries({
               queryKey: queryKeys.githubIssueLists(

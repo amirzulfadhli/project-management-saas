@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import type { Column, Task, UpdateTaskInput, UserSummary } from "@/lib/types";
@@ -10,12 +10,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
-import { TaskComments } from "@/components/tasks/task-comments";
-import { AttachmentsPanel } from "@/components/attachments/attachments-panel";
-import { TaskTimePanel } from "@/components/time-tracking/task-time-panel";
-import { TaskGithubPanel } from "@/components/github/task-github-panel";
+
+import {
+  taskFields,
+  taskDraftKey,
+  useTaskDrafts,
+  type TaskFields,
+} from "./task-drafts";
 
 interface TaskModalProps {
+  embedded?: boolean;
   onClose: () => void;
   organizationId: string;
   projectId: string;
@@ -31,14 +35,6 @@ interface TaskMutationContext {
   previousTasks?: Task[];
 }
 
-const taskPanels = [
-  { id: "details", label: "Details" },
-  { id: "comments", label: "Comments" },
-  { id: "attachments", label: "Files" },
-  { id: "time", label: "Time tracking" },
-  { id: "github", label: "GitHub" },
-] as const;
-
 export function TaskModal({
   onClose,
   organizationId,
@@ -48,7 +44,7 @@ export function TaskModal({
   defaultColumnId,
   eligibleAssignees,
   currentUserId,
-  canModerateComments,
+  embedded = false,
 }: TaskModalProps) {
   const queryClient = useQueryClient();
   const isEdit = Boolean(task);
@@ -63,18 +59,55 @@ export function TaskModal({
     projectColumns[0]?.id ??
     "";
 
-  const [title, setTitle] = useState(task?.title ?? "");
-  const [description, setDescription] = useState(task?.description ?? "");
-  const [priority, setPriority] = useState(task?.priority ?? 1);
-  const [columnId, setColumnId] = useState(initialColumnId);
-  const [assigneeId, setAssigneeId] = useState(task?.assigneeId ?? "");
-  const [dueDate, setDueDate] = useState(
-    task?.dueDate ? task.dueDate.slice(0, 10) : "",
+  const drafts = useTaskDrafts();
+  const draftKey = taskDraftKey(projectId, task?.id ?? "new");
+  const [initial] = useState(
+    () =>
+      drafts.get(draftKey) ?? {
+        baseline: task
+          ? taskFields(task)
+          : {
+              title: "",
+              description: "",
+              priority: 1,
+              columnId: initialColumnId,
+              assigneeId: "",
+              dueDate: "",
+            },
+        fields: task
+          ? taskFields(task)
+          : {
+              title: "",
+              description: "",
+              priority: 1,
+              columnId: initialColumnId,
+              assigneeId: "",
+              dueDate: "",
+            },
+        updatedAt: task?.updatedAt,
+      },
   );
+  const [fields, setFields] = useState<TaskFields>(initial.fields);
+  const { title, description, priority, columnId, assigneeId, dueDate } =
+    fields;
+  const setField = <K extends keyof TaskFields>(key: K, value: TaskFields[K]) =>
+    setFields((current) => ({ ...current, [key]: value }));
+  const dirty = JSON.stringify(fields) !== JSON.stringify(initial.baseline);
+  useEffect(() => {
+    if (dirty) drafts.set(draftKey, { ...initial, fields });
+    else drafts.delete(draftKey);
+  }, [dirty, drafts, draftKey, fields, initial]);
   const [error, setError] = useState<string | null>(null);
-  const [activePanel, setActivePanel] = useState<
-    "details" | "comments" | "attachments" | "time" | "github"
-  >("details");
+  const discard = () => {
+    if (dirty && !window.confirm("Discard unsaved Task changes?")) return;
+    drafts.delete(draftKey);
+    onClose();
+  };
+  const saved = () => {
+    drafts.delete(draftKey);
+    onClose();
+  };
+  const remoteChanged = Boolean(task && task.updatedAt !== initial.updatedAt);
 
   const listKey = queryKeys.tasks(projectId);
   const selectedColumn = projectColumns.find(
@@ -110,7 +143,7 @@ export function TaskModal({
           exact: true,
         }),
       ]);
-      onClose();
+      saved();
     },
     onError: (mutationError: unknown) =>
       setError(
@@ -126,16 +159,16 @@ export function TaskModal({
         throw new Error("Task is required for an update.");
       }
 
-      const input: UpdateTaskInput = {
-        title: title.trim(),
-        description: description.trim() || null,
-        columnId,
-        priority,
-        dueDate: dueDate || null,
-        ...(assigneeId !== (task.assigneeId ?? "") && {
-          assigneeId: assigneeId || null,
-        }),
-      };
+      // Send only explicitly changed fields; a title edit must not undo a remote move.
+      const input: UpdateTaskInput = {};
+      if (title !== initial.baseline.title) input.title = title.trim();
+      if (description !== initial.baseline.description)
+        input.description = description.trim() || null;
+      if (columnId !== initial.baseline.columnId) input.columnId = columnId;
+      if (priority !== initial.baseline.priority) input.priority = priority;
+      if (dueDate !== initial.baseline.dueDate) input.dueDate = dueDate || null;
+      if (assigneeId !== initial.baseline.assigneeId)
+        input.assigneeId = assigneeId || null;
       return api.updateTask(task.id, input);
     },
     onMutate: async (): Promise<TaskMutationContext> => {
@@ -147,6 +180,7 @@ export function TaskModal({
       if (
         previousTasks &&
         selectedColumn &&
+        columnId !== initial.baseline.columnId &&
         selectedColumn.id !== task.columnId
       ) {
         const appendPosition = previousTasks.reduce(
@@ -178,12 +212,16 @@ export function TaskModal({
       return { previousTasks };
     },
     onSuccess: (updatedTask) => {
+      queryClient.setQueryData(
+        queryKeys.task(projectId, updatedTask.id, currentUserId),
+        updatedTask,
+      );
       queryClient.setQueryData<Task[]>(listKey, (current) =>
         (current ?? []).map((item) =>
           item.id === updatedTask.id ? updatedTask : item,
         ),
       );
-      onClose();
+      saved();
     },
     onError: (mutationError: unknown, _input, context) => {
       if (context?.previousTasks) {
@@ -217,8 +255,16 @@ export function TaskModal({
       return api.deleteTask(task.id);
     },
     onSuccess: async () => {
-      onClose();
+      drafts.delete(draftKey);
       if (task) {
+        await queryClient.cancelQueries({
+          queryKey: queryKeys.task(projectId, task.id, currentUserId),
+          exact: true,
+        });
+        queryClient.setQueryData(
+          queryKeys.task(projectId, task.id, currentUserId),
+          null,
+        );
         queryClient.setQueryData<Task[]>(listKey, (current) =>
           current?.filter((item) => item.id !== task.id),
         );
@@ -265,6 +311,7 @@ export function TaskModal({
   const canSubmit =
     title.trim().length > 0 &&
     Boolean(selectedColumn) &&
+    (!isEdit || dirty) &&
     !createTask.isPending &&
     !updateTask.isPending &&
     !deleteTask.isPending;
@@ -289,270 +336,202 @@ export function TaskModal({
     }
   };
 
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={isEdit ? task?.title || "Task" : "New Task"}
-      size={isEdit ? "lg" : "md"}
-    >
-      {isEdit ? (
-        <div
-          className="mb-4 flex flex-wrap gap-1 rounded-md bg-hover p-1"
-          role="tablist"
-          aria-label="Task sections"
-        >
-          {taskPanels.map((panel) => (
-            <button
-              key={panel.id}
-              id={`task-${panel.id}-tab`}
-              type="button"
-              role="tab"
-              aria-selected={activePanel === panel.id}
-              aria-controls={`task-${panel.id}-panel`}
-              onClick={() => setActivePanel(panel.id)}
-              className={`min-w-24 flex-1 rounded-sm px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                activePanel === panel.id
-                  ? "bg-surface text-text-primary shadow-sm"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {panel.label}
-            </button>
-          ))}
+  const form = (
+    <form id="task-details-panel" onSubmit={handleSubmit} className="space-y-4">
+      <fieldset
+        className="space-y-4"
+        disabled={
+          createTask.isPending || updateTask.isPending || deleteTask.isPending
+        }
+      >
+        {remoteChanged && (
+          <p role="status" className="text-sm text-text-secondary">
+            This Task changed while you were editing. Your draft is preserved.
+            Saving replaces only fields you changed; cancel and reopen to use
+            the latest values.
+          </p>
+        )}
+        {dirty && (
+          <p className="text-xs text-text-secondary">
+            Unsaved changes stay in this session when you navigate away.
+          </p>
+        )}
+        <div className="space-y-1.5">
+          <label
+            htmlFor="task-title"
+            className="text-sm font-medium text-text-primary"
+          >
+            Title
+          </label>
+          <Input
+            id="task-title"
+            value={title}
+            onChange={(event) => setField("title", event.target.value)}
+            placeholder="Task title"
+            maxLength={200}
+          />
         </div>
-      ) : null}
 
-      {activePanel === "details" ? (
-        <form
-          id="task-details-panel"
-          role="tabpanel"
-          aria-labelledby="task-details-tab"
-          onSubmit={handleSubmit}
-          className="max-h-[68vh] space-y-4 overflow-y-auto pr-1"
-        >
+        <div className="space-y-1.5">
+          <label
+            htmlFor="task-description"
+            className="text-sm font-medium text-text-primary"
+          >
+            Description
+          </label>
+          <Textarea
+            id="task-description"
+            value={description}
+            onChange={(event) => setField("description", event.target.value)}
+            placeholder="Optional"
+            rows={3}
+            maxLength={10000}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <label
-              htmlFor="task-title"
+              htmlFor="task-column"
               className="text-sm font-medium text-text-primary"
             >
-              Title
+              Column
+            </label>
+            <Select
+              id="task-column"
+              value={columnId}
+              onChange={(event) => setField("columnId", event.target.value)}
+            >
+              {projectColumns.map((column) => (
+                <option key={column.id} value={column.id}>
+                  {column.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="task-assignee"
+              className="text-sm font-medium text-text-primary"
+            >
+              Assignee
+            </label>
+            <Select
+              id="task-assignee"
+              value={assigneeId}
+              disabled={!eligibleAssignees}
+              onChange={(event) => setField("assigneeId", event.target.value)}
+            >
+              <option value="">Unassigned</option>
+              {eligibleAssignees ? (
+                <>
+                  {task?.assignee &&
+                  !eligibleAssignees.some(
+                    (candidate) => candidate.id === task.assignee?.id,
+                  ) ? (
+                    <option value={task.assignee.id} disabled>
+                      {task.assignee.name} (no longer has access)
+                    </option>
+                  ) : null}
+                  {eligibleAssignees.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.name} ({candidate.email})
+                    </option>
+                  ))}
+                </>
+              ) : task?.assignee ? (
+                <option value={task.assignee.id}>{task.assignee.name}</option>
+              ) : null}
+            </Select>
+            {!eligibleAssignees ? (
+              <p className="text-xs text-text-secondary">
+                Assignee changes are unavailable until the Project&apos;s
+                Organization collaborators load.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="task-priority"
+              className="text-sm font-medium text-text-primary"
+            >
+              Priority
+            </label>
+            <Select
+              id="task-priority"
+              value={priority}
+              onChange={(event) =>
+                setField("priority", Number(event.target.value))
+              }
+            >
+              {[1, 2, 3, 4].map((value) => (
+                <option key={value} value={value}>
+                  {["Low", "Medium", "High", "Urgent"][value - 1]}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="task-due"
+              className="text-sm font-medium text-text-primary"
+            >
+              Due date
             </label>
             <Input
-              id="task-title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Task title"
-              autoFocus
-              maxLength={200}
+              id="task-due"
+              type="date"
+              value={dueDate}
+              onChange={(event) => setField("dueDate", event.target.value)}
             />
           </div>
+        </div>
 
-          <div className="space-y-1.5">
-            <label
-              htmlFor="task-description"
-              className="text-sm font-medium text-text-primary"
-            >
-              Description
-            </label>
-            <Textarea
-              id="task-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="Optional"
-              rows={3}
-              maxLength={10000}
-            />
-          </div>
+        {error ? (
+          <p className="text-sm text-danger" role="alert">
+            {error}
+          </p>
+        ) : null}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label
-                htmlFor="task-column"
-                className="text-sm font-medium text-text-primary"
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <div>
+            {isEdit ? (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={handleDelete}
+                disabled={deleteTask.isPending}
               >
-                Column
-              </label>
-              <Select
-                id="task-column"
-                value={columnId}
-                onChange={(event) => setColumnId(event.target.value)}
-              >
-                {projectColumns.map((column) => (
-                  <option key={column.id} value={column.id}>
-                    {column.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label
-                htmlFor="task-assignee"
-                className="text-sm font-medium text-text-primary"
-              >
-                Assignee
-              </label>
-              <Select
-                id="task-assignee"
-                value={assigneeId}
-                disabled={!eligibleAssignees}
-                onChange={(event) => setAssigneeId(event.target.value)}
-              >
-                <option value="">Unassigned</option>
-                {eligibleAssignees ? (
-                  <>
-                    {task?.assignee &&
-                    !eligibleAssignees.some(
-                      (candidate) => candidate.id === task.assignee?.id,
-                    ) ? (
-                      <option value={task.assignee.id} disabled>
-                        {task.assignee.name} (no longer has access)
-                      </option>
-                    ) : null}
-                    {eligibleAssignees.map((candidate) => (
-                      <option key={candidate.id} value={candidate.id}>
-                        {candidate.name} ({candidate.email})
-                      </option>
-                    ))}
-                  </>
-                ) : task?.assignee ? (
-                  <option value={task.assignee.id}>{task.assignee.name}</option>
-                ) : null}
-              </Select>
-              {!eligibleAssignees ? (
-                <p className="text-xs text-text-secondary">
-                  Assignee changes are unavailable until the Project&apos;s
-                  Organization collaborators load.
-                </p>
-              ) : null}
-            </div>
-
-            <div className="space-y-1.5">
-              <label
-                htmlFor="task-priority"
-                className="text-sm font-medium text-text-primary"
-              >
-                Priority
-              </label>
-              <Select
-                id="task-priority"
-                value={priority}
-                onChange={(event) => setPriority(Number(event.target.value))}
-              >
-                {[1, 2, 3, 4].map((value) => (
-                  <option key={value} value={value}>
-                    {["Low", "Medium", "High", "Urgent"][value - 1]}
-                  </option>
-                ))}
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label
-                htmlFor="task-due"
-                className="text-sm font-medium text-text-primary"
-              >
-                Due date
-              </label>
-              <Input
-                id="task-due"
-                type="date"
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-              />
-            </div>
-          </div>
-
-          {error ? (
-            <p className="text-sm text-danger" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <div>
-              {isEdit ? (
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={handleDelete}
-                  disabled={deleteTask.isPending}
-                >
-                  {deleteTask.isPending
-                    ? "Deleting permanently..."
-                    : "Delete permanently"}
-                </Button>
-              ) : null}
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" variant="ghost" onClick={onClose}>
-                Cancel
+                {deleteTask.isPending
+                  ? "Deleting permanently..."
+                  : "Delete permanently"}
               </Button>
-              <Button type="submit" disabled={!canSubmit}>
-                {createTask.isPending || updateTask.isPending
-                  ? "Saving..."
-                  : isEdit
-                    ? "Save"
-                    : "Create Task"}
-              </Button>
-            </div>
+            ) : null}
           </div>
-        </form>
-      ) : activePanel === "comments" && task ? (
-        <div
-          id="task-comments-panel"
-          role="tabpanel"
-          aria-labelledby="task-comments-tab"
-        >
-          <TaskComments
-            taskId={task.id}
-            projectId={projectId}
-            currentUserId={currentUserId}
-            canModerate={canModerateComments}
-          />
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" onClick={discard}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!canSubmit}>
+              {createTask.isPending || updateTask.isPending
+                ? "Saving..."
+                : isEdit
+                  ? "Save"
+                  : "Create Task"}
+            </Button>
+          </div>
         </div>
-      ) : activePanel === "attachments" && task ? (
-        <div
-          id="task-attachments-panel"
-          role="tabpanel"
-          aria-labelledby="task-attachments-tab"
-          className="max-h-[68vh] overflow-y-auto pr-1"
-        >
-          <AttachmentsPanel
-            scope="task"
-            resourceId={task.id}
-            projectId={projectId}
-            currentUserId={currentUserId}
-            canAdminister={canModerateComments}
-          />
-        </div>
-      ) : activePanel === "time" && task ? (
-        <div
-          id="task-time-panel"
-          role="tabpanel"
-          aria-labelledby="task-time-tab"
-        >
-          <TaskTimePanel
-            taskId={task.id}
-            projectId={projectId}
-            currentUserId={currentUserId}
-          />
-        </div>
-      ) : activePanel === "github" && task ? (
-        <div
-          id="task-github-panel"
-          role="tabpanel"
-          aria-labelledby="task-github-tab"
-          className="max-h-[68vh] overflow-y-auto pr-1"
-        >
-          <TaskGithubPanel
-            taskId={task.id}
-            projectId={projectId}
-            currentUserId={currentUserId}
-          />
-        </div>
-      ) : null}
+      </fieldset>
+    </form>
+  );
+  return embedded ? (
+    form
+  ) : (
+    <Modal open onClose={discard} title="New Task">
+      {form}
     </Modal>
   );
 }

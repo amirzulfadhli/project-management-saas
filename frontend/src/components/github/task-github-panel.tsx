@@ -18,13 +18,16 @@ export function TaskGithubPanel({
   taskId,
   projectId,
   currentUserId,
+  compact = false,
 }: {
   taskId: string;
   projectId: string;
   currentUserId: string | null;
+  compact?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
+  const [choosing, setChoosing] = useState(false);
   const [selectedNumber, setSelectedNumber] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const issueKey = queryKeys.taskGithubIssue(taskId, currentUserId);
@@ -51,7 +54,11 @@ export function TaskGithubPanel({
         perPage: pageSize,
         state: "open",
       }),
-    enabled: linked.isSuccess && !linked.data && Boolean(repository.data),
+    enabled:
+      (!compact || choosing) &&
+      linked.isSuccess &&
+      !linked.data &&
+      Boolean(repository.data),
   });
 
   const refreshProjectGithub = async () => {
@@ -153,6 +160,12 @@ export function TaskGithubPanel({
       />
     );
   }
+  if (compact && !choosing)
+    return (
+      <Button variant="secondary" size="sm" onClick={() => setChoosing(true)}>
+        Link GitHub Issue
+      </Button>
+    );
   if (issues.isPending) return <Loading />;
   if (issues.isError) {
     return (

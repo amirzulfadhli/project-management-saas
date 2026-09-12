@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { taskHref } from "@/lib/task-links";
 import { useQuery } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 import { api, ApiError } from "@/lib/api";
@@ -59,9 +61,12 @@ export function ProjectTimePanel({ projectId }: { projectId: string }) {
                       key={task.taskId}
                       className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
                     >
-                      <span className="min-w-0 truncate text-text-primary">
+                      <Link
+                        className="min-w-0 truncate text-primary hover:underline"
+                        href={taskHref(projectId, task.taskId)}
+                      >
                         {task.title}
-                      </span>
+                      </Link>
                       <span className="shrink-0 font-medium text-text-primary">
                         {formatDuration(task.totalSeconds)}
                       </span>

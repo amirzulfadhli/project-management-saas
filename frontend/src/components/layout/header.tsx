@@ -27,6 +27,7 @@ export default function Header({
   const projectName =
     !project.isError && projectId ? project.data?.name : undefined;
   const sections: Record<string, string> = {
+    tasks: "Task",
     docs: "Docs",
     files: "Files",
     activity: "Activity",

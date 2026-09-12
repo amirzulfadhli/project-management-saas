@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { taskHref } from "@/lib/task-links";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -153,7 +155,13 @@ export function ProjectGithubIssues({
                 </div>
                 {issue.linkedTask ? (
                   <p className="mt-1 text-xs text-text-secondary">
-                    Linked to {issue.linkedTask.title}
+                    Linked to{" "}
+                    <Link
+                      href={taskHref(projectId, issue.linkedTask.id)}
+                      className="text-primary hover:underline"
+                    >
+                      {issue.linkedTask.title}
+                    </Link>
                   </p>
                 ) : null}
               </div>

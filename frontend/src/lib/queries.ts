@@ -43,6 +43,8 @@ export const queryKeys = {
     ] as const,
   taskGithubIssue: (taskId: string, userId: string | null = null) =>
     ["task-github-issue", { taskId, userId }] as const,
+  task: (projectId: string, taskId: string, userId: string | null) =>
+    ["task-detail", { projectId, taskId, userId }] as const,
   taskLists: ["tasks"] as const,
   tasks: (projectId: string, filters: TaskFilters = {}) =>
     ["tasks", { projectId, ...filters }] as const,

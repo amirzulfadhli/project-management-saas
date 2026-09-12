@@ -1,9 +1,9 @@
-# UI refinement — Phases A and B
+# UI refinement — Phases A, B and C
 
 Phase A implements the approved shell, navigation, spacing and interaction
 foundation. Phase B adds the persistent Project workspace described below.
-Task-detail/Board redesign (Phase C) and resource-experience refinement (Phase D)
-have **not** started.
+Phase C adds reading-first Task detail and Board interaction refinement.
+Resource-experience refinement (Phase D) has **not** started.
 
 ## Implemented
 
@@ -184,4 +184,105 @@ Manual acceptance is still required for:
 
 No browser automation or manual acceptance was performed. Live GitHub remains
 blocked on public HTTPS/live App credentials. Deployment remains outside scope.
-Phase C is not started; V1 functional freeze is not restored.
+Phase B is checkpointed; V1 functional freeze is not restored.
+
+## Phase C — Task detail and Board interaction
+
+### Identity and presentation
+
+`/projects/:projectId/tasks/:taskId` is the canonical Task destination. Board
+opening uses a history push; Home due Tasks, global Task rows, Project Time and
+linked GitHub Issues use the same URL. An intercepted root parallel slot presents
+in-app navigation as a wide native-dialog sheet, full-width at mobile sizes.
+Direct visits and reloads render the same content inside the Project workspace.
+Sheet Close/Back returns through history; a direct page has a safe Board fallback.
+
+The slot has explicit default, root and catch-all dismissals, plus a current-path
+guard. This prevents a retained parallel slot showing a previous Task after
+navigation. Legacy `/projects/:id?task=:taskId` remains supported as a full detail
+presentation at that URL, without a second local selected-Task snapshot or a
+forced reload. This compatibility handling deliberately does not redirect through
+an intercepted replacement that could lose its safe close destination.
+
+Task detail uses the existing authenticated `GET /api/tasks/:id`, checking the
+returned Project ID before rendering. Its new query key includes Project, Task
+and current user. Direct Task reading does not download the Board's entire Task
+list. Sheets reuse the Project permission/query boundary; their subscription
+references share the existing session connection and server Project room with
+the background workspace. A sheet does not change the background Organization
+selection. Backend authorization remains authoritative.
+
+### Reading and editing
+
+Task detail opens read-first: title, Column, assignee, priority, due date and
+plain-text description, then the existing Comments and timer controls. Files are
+an explicitly opened disclosure. GitHub linkage is visible, with Issue discovery
+deferred until the user chooses to link. Manual time/history is a disclosure;
+its form stays mounted so collapsing it does not lose input. Project Activity
+remains a Project link, not an invented Task feed.
+
+Edit is explicit, with the existing form, Save/Cancel, select-based Column move,
+validation and confirmed permanent deletion. Create remains a small dialog with
+an explicit destination Column. Cards remain compact, with separate open/drag
+targets. Column names wrap, counts remain visible and owner-only contextual
+controls open the existing manager at that Column. There is no Column reordering.
+
+Metadata drafts and plain Comment/manual-time inputs survive route unmounts in
+account-keyed React memory. Cancel confirms metadata discard; successful saves
+clear their drafts, including completed responses after navigation. Browser unload
+warns while drafts remain. Account changes/sign-out clear all draft memory.
+Nothing is persisted to browser storage, query caches or a draft API. File-input
+selections and GitHub chooser state are not durable drafts.
+
+Realtime updates refresh read mode but do not replace a metadata draft. An
+updated timestamp warns when the server snapshot changed; saves send only fields
+the user changed, so editing a title does not undo a concurrent Column move.
+Concurrent writes to the **same field remain last-committed-write**: there is no
+backend version check, locking or claim of conflict-free editing.
+
+### Deletion, revocation and reconciliation
+
+A compact Task deletion event cancels in-flight detail fetches and tombstones the
+matching detail cache before list reconciliation. A late old response cannot
+resurrect the displayed Task. Confirmed local deletion follows the same approach.
+Missing/mismatched Tasks and 403/404 reads show only “This task is no longer
+available.” Definitively unavailable Tasks discard their Task-scoped drafts.
+Transient read failures hide stale detail and offer Retry. Project access failure
+continues to remove protected content through the Phase B workspace boundary.
+
+Task/GitHub events invalidate the matching user-scoped detail. Reconnect now
+covers opened detail and related Comment, Files, Time and GitHub caches even
+when no Board Task list has been loaded. Compact backend event envelopes,
+membership reauthorization, Notifications and API mutation contracts are unchanged.
+
+### Verification and remaining acceptance
+
+The full frontend suite passed **95/95 in 12 suites**. Final review corrected
+one presentation regression: timer mutation errors now remain visible outside
+the collapsed manual-time disclosure. The affected detail suite passes **15/15**
+with that additional regression test. TypeScript, ESLint, changed-file Prettier,
+the production build and `git diff --check` pass. Backend/PostgreSQL tests were
+not rerun because their implementation and contracts are unchanged.
+Component tests cover route wrappers/entry points, default reading, edit drafts,
+account reset, missing/denied/deleted Tasks, cancellation of stale fetches,
+reconnect scoping, Comments/timers, and Board move/index/rollback contracts.
+DnD sensors are emulated for contract tests; they do **not** prove physical
+pointer/touch/keyboard behavior. Native interception/history, dialog focus and
+layout also require manual acceptance.
+
+Required manual retest:
+
+- Board, Tasks, Home, Time and GitHub entry points; direct canonical and legacy
+  links; refresh, Back/Forward, sheet dismissal and Project navigation.
+- New Task creation, Edit/Save/Cancel, dirty navigation, browser unload, account
+  change, Comment/reply/edit drafts and manual-time drafts.
+- Two clients: Task update/move/delete, GitHub inbound sync, membership changes,
+  final access loss and reconnect while detail is open.
+- Pointer/keyboard/touch reorder and cross-Column movement, rollback, focus return,
+  empty Columns, contextual administration and horizontal Board scroll.
+- Desktop and approximately 390px: long text, sheet viewport bounds, focus,
+  Comments/timer discoverability and nested confirmations.
+
+No browser automation/manual acceptance, backend/schema/database changes,
+new dependencies, or Phase D implementation were performed.
+Functional freeze remains reopened pending manual acceptance.

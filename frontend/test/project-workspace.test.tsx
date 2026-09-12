@@ -73,6 +73,13 @@ jest.mock("@/components/tasks/task-modal", () => ({
     </div>
   ),
 }));
+jest.mock("@/components/tasks/task-route", () => ({
+  TaskRoute: ({ projectId, taskId }: { projectId: string; taskId: string }) => (
+    <p>
+      Task route {projectId}/{taskId}
+    </p>
+  ),
+}));
 jest.mock("@/components/projects/project-kanban", () => ({
   ProjectKanban: ({
     tasks,
@@ -270,18 +277,13 @@ test("duplicate retains the API and adds only the server-returned Project to its
   );
   expect(api.duplicateProject).toHaveBeenCalledWith("project-a");
 });
-test("legacy Task deep-link and remote deletion handling survive Board extraction", async () => {
+test("legacy Task deep-link uses the shared Task route identity", async () => {
   mockSearch = "task=task-a";
   jest
     .mocked(api.getTasks)
     .mockResolvedValue([{ id: "task-a", title: "Linked Task" }] as Task[]);
-  const view = setup(<ProjectBoard />);
-  await screen.findByRole("dialog");
-  await act(async () =>
-    view.client.setQueryData(queryKeys.tasks("project-a"), []),
-  );
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  expect(screen.getByText("This task is no longer available.")).toBeTruthy();
+  setup(<ProjectBoard />);
+  await screen.findByText("Task route project-a/task-a");
 });
 test("collaborators retain Task creation but not structural Column controls", async () => {
   mockOrganization = null;

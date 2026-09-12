@@ -1,4 +1,4 @@
-import type { ProjectDetail, ProjectSummary } from "@/lib/types";
+import type { ProjectDetail, ProjectSummary, Task } from "@/lib/types";
 export const user = {
   id: "user-a",
   name: "Sarah",
@@ -37,3 +37,30 @@ export const projectSummary = {
   ...projectFixture,
   _count: { tasks: 3, projectMembers: 1 },
 } as ProjectSummary;
+export const taskFixture: Task = {
+  id: "task-a",
+  projectId: "project-a",
+  columnId: "column-a",
+  title: "Recover session",
+  description: "Plain text description",
+  assigneeId: null,
+  priority: 2,
+  position: 0,
+  reporterId: user.id,
+  reporter: user,
+  assignee: null,
+  column,
+  project: projectFixture,
+  dueDate: null,
+  estimatedTime: null,
+  actualTime: null,
+  startDate: null,
+  completedAt: null,
+  createdAt: "2026-09-01T00:00:00Z",
+  updatedAt: "2026-09-01T00:00:00Z",
+  githubIssueId: null,
+  githubIssueNumber: null,
+  githubBranch: null,
+  githubPrNumbers: [],
+  deploymentStatus: null,
+};

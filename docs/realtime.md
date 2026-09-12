@@ -141,3 +141,14 @@ write permission.
   acceptance remains part of the consolidated manual QA follow-up.
 - Time tracking publishes compact aggregate invalidations only; notes,
   timestamps, and duration values are never broadcast.
+
+### Phase C Task detail
+
+Canonical Task pages and intercepted sheets use a Project/Task/user-scoped detail
+cache. The shared Project subscription remains reference counted on the existing
+session socket. Task changes and GitHub sync invalidate only the matching detail;
+reconnect includes open detail and Comment/Files/Time/GitHub queries even without
+a loaded Board list. TASK_DELETED cancels the matching in-flight detail query
+before storing a null tombstone, preventing a stale response from restoring it.
+No new backend events or payload fields are introduced. Manual two-client
+acceptance is still pending; frontend contract tests are not browser acceptance.

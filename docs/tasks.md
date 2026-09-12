@@ -203,13 +203,13 @@ Task array and surfaces an inline error. Every outcome refetches the exact cache
 so PostgreSQL remains authoritative. The edit form keeps a select-based Column
 movement fallback.
 
-Permanent deletion from the board modal waits for backend success before
+Permanent deletion from Task detail waits for backend success before
 removing the row, ensuring a failed deletion leaves the open Task and its error
 state intact. Deletion from the Organization Tasks page follows the same
 authoritative-success policy. Both paths invalidate only the affected Project
 Task cache. For collaborator deletion, the compact realtime event removes the
-Task from that Project cache immediately; an open or deep-linked dialog closes
-and the board shows "This task is no longer available."
+Task from that Project cache immediately and tombstones the Task detail cache;
+the current detail shows "This task is no longer available."
 
 ## Forms, dates, and destructive actions
 
@@ -229,7 +229,7 @@ The frontend Task type now mirrors the compact backend response, including
 time fields, and the existing GitHub/deployment scalar fields. The legacy
 database status value is intentionally absent from the frontend contract.
 
-The frontend has no dedicated automated test runner. In addition to TypeScript,
+The frontend now has Jest component/contract tests. In addition to TypeScript,
 ESLint, formatting, production build, and PostgreSQL lifecycle coverage, the
 ordered board has now passed real Edge acceptance for pointer, touch, and
 keyboard movement. Keyboard focus is restored to the moved handle after the
@@ -250,3 +250,21 @@ sets the Activity `taskId` to null, while required `projectId` and metadata keep
 the history readable. Task deletion also cascade-deletes its Comments while
 leaving `TASK_DELETED` Activity intact. This does not change the existing
 permanent Task deletion contract.
+
+## Phase C Task presentation
+
+The canonical frontend route is `/projects/:projectId/tasks/:taskId`. In-app
+navigation uses a wide sheet; a direct visit/reload uses a full Project page.
+Legacy `?task=` links remain accepted. Home, global Tasks, Project Time and
+GitHub linked-Issue entries preserve the exact Task identity.
+
+The shared detail is read-first, with explicit Edit/Save/Cancel, visible Comments
+and timer controls, Task files and GitHub context. Only explicitly changed
+metadata fields are sent on update. Column is still canonical workflow state.
+Account-scoped, memory-only drafts survive navigation and remain separate from
+server/query data. Same-field concurrent edits remain last-write-wins.
+
+See [UI refinement](ui-refinement.md#phase-c--task-detail-and-board-interaction)
+for cache/deletion handling, draft limitations and required manual acceptance.
+Earlier Edge acceptance covers the old Board implementation, not acceptance of
+the current Phase C presentation. Browser retesting remains required.

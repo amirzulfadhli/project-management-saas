@@ -4,11 +4,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/queries";
+import { taskHref } from "@/lib/task-links";
 import type { Task } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { TaskRoute } from "@/components/tasks/task-route";
 import { TaskModal } from "@/components/tasks/task-modal";
 import { ProjectKanban } from "./project-kanban";
 import { ProjectColumnsModal } from "./project-columns-modal";
@@ -35,33 +37,20 @@ export function ProjectBoard() {
     open: false,
     task: null,
   });
+  const [managedColumnId, setManagedColumnId] = useState<string | undefined>();
   const [columnsOpen, setColumnsOpen] = useState(false);
   const requestedTaskId = searchParams.get("task");
   const tasksQuery = useQuery({
     queryKey: queryKeys.tasks(id),
     queryFn: () => api.getTasks(id),
+    enabled: !requestedTaskId,
   });
-  const requestedTask = requestedTaskId
-    ? tasksQuery.data?.find((task) => task.id === requestedTaskId)
-    : undefined;
-  const requestedTaskIsUnavailable = Boolean(
-    requestedTaskId && tasksQuery.isSuccess && !requestedTask,
-  );
-  const visibleTaskModal: TaskModalState = requestedTaskId
-    ? requestedTask
-      ? { open: true, task: requestedTask }
-      : { open: false, task: null }
-    : taskModal;
+  const closeTaskModal = () => setTaskModal({ open: false, task: null });
+  const openTaskModal = (task: Task) =>
+    router.push(taskHref(id, task.id), { scroll: false });
 
-  const closeTaskModal = () => {
-    setTaskModal({ open: false, task: null });
-    router.replace(`/projects/${id}`, { scroll: false });
-  };
-
-  const openTaskModal = (task: Task) => {
-    setTaskModal({ open: true, task });
-    router.replace(`/projects/${id}?task=${task.id}`, { scroll: false });
-  };
+  if (requestedTaskId)
+    return <TaskRoute projectId={id} taskId={requestedTaskId} />;
 
   return (
     <div className="min-w-0 space-y-4">
@@ -70,16 +59,14 @@ export function ProjectBoard() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => setColumnsOpen(true)}
+            onClick={() => {
+              setManagedColumnId(undefined);
+              setColumnsOpen(true);
+            }}
           >
             Manage Columns
           </Button>
         </div>
-      ) : null}
-      {requestedTaskIsUnavailable ? (
-        <p role="status" className="text-sm text-text-secondary">
-          This task is no longer available.
-        </p>
       ) : null}
       {/* Board */}
       {columnsQuery.isError ? (
@@ -110,6 +97,14 @@ export function ProjectBoard() {
       ) : (
         <ProjectKanban
           projectId={data.id}
+          onManageColumn={
+            canAdministerProject
+              ? (columnId) => {
+                  setManagedColumnId(columnId);
+                  setColumnsOpen(true);
+                }
+              : undefined
+          }
           columns={columns}
           tasks={tasksQuery.data ?? []}
           onOpenTask={openTaskModal}
@@ -123,14 +118,14 @@ export function ProjectBoard() {
         />
       )}
 
-      {visibleTaskModal.open ? (
+      {taskModal.open ? (
         <TaskModal
           onClose={closeTaskModal}
           organizationId={data.organizationId}
           projectId={data.id}
           columns={columns}
-          task={visibleTaskModal.task}
-          defaultColumnId={visibleTaskModal.defaultColumnId}
+          task={taskModal.task}
+          defaultColumnId={taskModal.defaultColumnId}
           eligibleAssignees={eligibleAssignees}
           currentUserId={currentUserId}
           canModerateComments={canAdministerProject}
@@ -142,6 +137,7 @@ export function ProjectBoard() {
           open
           onClose={() => setColumnsOpen(false)}
           projectId={id}
+          focusColumnId={managedColumnId}
         />
       ) : null}
     </div>

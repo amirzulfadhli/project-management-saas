@@ -1,5 +1,6 @@
 "use client";
 
+import { taskDraftKey, useTaskField } from "./task-drafts";
 import { useMemo, useState } from "react";
 import {
   useInfiniteQuery,
@@ -38,10 +39,23 @@ export function TaskComments({
 }: TaskCommentsProps) {
   const queryClient = useQueryClient();
   const commentsKey = queryKeys.taskComments(taskId);
-  const [content, setContent] = useState("");
-  const [replyToId, setReplyToId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState("");
+  const draftPrefix = taskDraftKey(projectId, taskId) + ":comment:";
+  const [content, setContent] = useTaskField<string>(
+    draftPrefix + "content",
+    "",
+  );
+  const [replyToId, setReplyToId] = useTaskField<string | null>(
+    draftPrefix + "reply",
+    null,
+  );
+  const [editingId, setEditingId] = useTaskField<string | null>(
+    draftPrefix + "editing",
+    null,
+  );
+  const [editContent, setEditContent] = useTaskField<string>(
+    draftPrefix + "editContent",
+    "",
+  );
   const [mutationError, setMutationError] = useState<string | null>(null);
 
   const commentsQuery = useInfiniteQuery({

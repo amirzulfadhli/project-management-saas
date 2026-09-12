@@ -55,9 +55,11 @@ export function useProjectWorkspace() {
 export function ProjectWorkspace({
   id,
   children,
+  compact = false,
 }: {
   id: string;
   children: ReactNode;
+  compact?: boolean;
 }) {
   const pathname = usePathname();
   const { data: session } = authClient.useSession();
@@ -78,6 +80,7 @@ export function ProjectWorkspace({
   );
   const currentProjectId = project.data?.id ?? null;
   const projectContextIsReady =
+    compact ||
     !projectOrganizationIsSelectable ||
     selectedOrganizationId === projectOrganizationId;
   const realtimeStatus = useProjectRealtime(
@@ -99,6 +102,7 @@ export function ProjectWorkspace({
 
   useEffect(() => {
     if (
+      !compact &&
       projectOrganizationId &&
       projectOrganizationIsSelectable &&
       projectOrganizationId !== selectedOrganizationId
@@ -106,6 +110,7 @@ export function ProjectWorkspace({
       selectOrganization(projectOrganizationId);
     }
   }, [
+    compact,
     projectOrganizationId,
     projectOrganizationIsSelectable,
     selectOrganization,
@@ -198,85 +203,91 @@ export function ProjectWorkspace({
         canAdministerProject: administrationAllowed,
       }}
     >
-      <div className="min-w-0 space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="mb-1 truncate text-sm text-text-secondary">
-              {data.organization.name}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="min-w-0 break-words text-xl font-semibold">
-                {data.name}
-              </h1>
-              {data.archivedAt ? <Badge tone="neutral">Archived</Badge> : null}
-            </div>
-            {data.description ? (
-              data.description.length <= 180 ? (
-                <p className="mt-2 max-w-3xl break-words text-sm text-text-secondary">
-                  {data.description}
-                </p>
-              ) : (
-                <details className="mt-2 max-w-3xl text-sm text-text-secondary">
-                  <summary className="cursor-pointer">
-                    Project description
-                  </summary>
-                  <p className="mt-2 whitespace-pre-wrap break-words">
+      {compact ? (
+        children
+      ) : (
+        <div className="min-w-0 space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 truncate text-sm text-text-secondary">
+                {data.organization.name}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="min-w-0 break-words text-xl font-semibold">
+                  {data.name}
+                </h1>
+                {data.archivedAt ? (
+                  <Badge tone="neutral">Archived</Badge>
+                ) : null}
+              </div>
+              {data.description ? (
+                data.description.length <= 180 ? (
+                  <p className="mt-2 max-w-3xl break-words text-sm text-text-secondary">
                     {data.description}
                   </p>
-                </details>
-              )
-            ) : null}
-          </div>
-          <nav
-            aria-label="Project administration"
-            className="flex flex-wrap gap-2"
-          >
-            <Link
-              aria-current={
-                pathname === `/projects/${id}/members` ? "page" : undefined
-              }
-              className="control-target inline-flex items-center rounded-md border border-border px-3 text-sm hover:bg-hover aria-[current=page]:bg-selected aria-[current=page]:text-primary"
-              href={`/projects/${id}/members`}
+                ) : (
+                  <details className="mt-2 max-w-3xl text-sm text-text-secondary">
+                    <summary className="cursor-pointer">
+                      Project description
+                    </summary>
+                    <p className="mt-2 whitespace-pre-wrap break-words">
+                      {data.description}
+                    </p>
+                  </details>
+                )
+              ) : null}
+            </div>
+            <nav
+              aria-label="Project administration"
+              className="flex flex-wrap gap-2"
             >
-              Members
-            </Link>
-            {administrationAllowed ? (
               <Link
                 aria-current={
-                  pathname === `/projects/${id}/settings` ? "page" : undefined
+                  pathname === `/projects/${id}/members` ? "page" : undefined
                 }
                 className="control-target inline-flex items-center rounded-md border border-border px-3 text-sm hover:bg-hover aria-[current=page]:bg-selected aria-[current=page]:text-primary"
-                href={`/projects/${id}/settings`}
+                href={`/projects/${id}/members`}
               >
-                Project settings
+                Members
               </Link>
-            ) : null}
-          </nav>
+              {administrationAllowed ? (
+                <Link
+                  aria-current={
+                    pathname === `/projects/${id}/settings` ? "page" : undefined
+                  }
+                  className="control-target inline-flex items-center rounded-md border border-border px-3 text-sm hover:bg-hover aria-[current=page]:bg-selected aria-[current=page]:text-primary"
+                  href={`/projects/${id}/settings`}
+                >
+                  Project settings
+                </Link>
+              ) : null}
+            </nav>
+          </div>
+          <ProjectNavigation id={id} />
+          {data.archivedAt ? (
+            <p
+              role="status"
+              className="border-l-2 border-border-strong pl-3 text-sm text-text-secondary"
+            >
+              This Project is archived. Its work and history are preserved.
+              {administrationAllowed ? " Restore it in Project settings." : ""}
+            </p>
+          ) : null}
+          {membersQuery.isError ? (
+            <ErrorState
+              message="Could not refresh Project permissions."
+              onRetry={() => membersQuery.refetch()}
+            />
+          ) : null}
+          {realtimeStatus === "unavailable" ? (
+            <p role="status" className="text-sm text-text-secondary">
+              Live updates are temporarily unavailable. Your changes still save
+              normally; refresh to reconcile collaborators&apos; changes.
+            </p>
+          ) : null}
+          {children}
         </div>
-        <ProjectNavigation id={id} />
-        {data.archivedAt ? (
-          <p
-            role="status"
-            className="border-l-2 border-border-strong pl-3 text-sm text-text-secondary"
-          >
-            This Project is archived. Its work and history are preserved.
-            {administrationAllowed ? " Restore it in Project settings." : ""}
-          </p>
-        ) : null}
-        {membersQuery.isError ? (
-          <ErrorState
-            message="Could not refresh Project permissions."
-            onRetry={() => membersQuery.refetch()}
-          />
-        ) : null}
-        {realtimeStatus === "unavailable" ? (
-          <p role="status" className="text-sm text-text-secondary">
-            Live updates are temporarily unavailable. Your changes still save
-            normally; refresh to reconcile collaborators&apos; changes.
-          </p>
-        ) : null}
-        {children}
-      </div>
+      )}
     </ProjectContext.Provider>
   );
 }

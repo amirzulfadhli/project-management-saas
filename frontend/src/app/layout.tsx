@@ -10,14 +10,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
+  task,
 }: {
   children: React.ReactNode;
+  task?: React.ReactNode;
 }) {
   return (
     <html lang="en" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
         <Providers>
-          <AuthBoundary>{children}</AuthBoundary>
+          <AuthBoundary>
+            {children}
+            {task}
+          </AuthBoundary>
         </Providers>
       </body>
     </html>

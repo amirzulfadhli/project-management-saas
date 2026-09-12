@@ -64,8 +64,34 @@ lifecycle, authority, archives, legacy Task links, resource extraction and draft
 retention. TypeScript, ESLint, changed-file Prettier, production build and
 `git diff --check` pass; final verification details are in the UI refinement doc.
 No backend, API, database, dependency or Task/drag-and-drop contract changed.
-**PHASE B MANUAL UI ACCEPTANCE: PENDING. Phase C has not begun.**
+**PHASE B MANUAL UI ACCEPTANCE: PENDING.**
 Functional freeze remains reopened until manual acceptance.
+
+### UI refinement Phase C
+
+Task detail and Board interaction refinement is implemented: canonical Task
+routes with intercepted sheets/direct pages, reading-first content, visible
+Comments and timer controls, explicit editing with account-scoped draft memory,
+and consistent links from Board, Home, Tasks, Time and GitHub. Legacy query links
+remain supported. Structural Column controls remain owner-only and reuse the
+existing manager; drag sensors, ordering, rollback and backend policy are unchanged.
+
+Task detail reads the existing endpoint with Project/Task/user-scoped cache
+identity. Deleted/inaccessible Tasks stop rendering protected content; deletion
+cancels in-flight detail reads. Realtime/reconnect reconciliation includes open
+Task detail and its resources. Dirty fields are not overwritten on refetch;
+partial updates avoid reverting unrelated concurrent changes. Same-field writes
+remain last-committed-write, not optimistic concurrency control.
+
+Final automated verification: the full frontend suite passed **95/95 in 12
+suites**. Final review then found and corrected a timer-error message hidden
+inside the collapsed manual-time disclosure; the affected detail suite passes
+**15/15**, including its new regression test. TypeScript, ESLint, changed-file
+Prettier, production build and `git diff --check` pass.
+No backend, migration, database or dependency changes. Historical backend and
+PostgreSQL counts above were not rerun for this frontend-only phase.
+**PHASE C MANUAL UI ACCEPTANCE: PENDING. Phase D has not begun.**
+V1 functional freeze remains reopened.
 
 ### Previous defect-closure verification
 

@@ -378,6 +378,8 @@ export const api = {
     ),
 
   // Tasks
+  getTask: (id: string) =>
+    request<Task>(`/api/tasks/${encodeURIComponent(id)}`),
   getTasks: (projectId: string, filters: TaskFilters = {}) =>
     request<Task[]>(
       withQuery("/api/tasks", {

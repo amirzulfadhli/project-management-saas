@@ -28,7 +28,7 @@ export function Modal({
   title: string;
   children: React.ReactNode;
   size?: "md" | "lg" | "xl";
-  placement?: "center" | "header" | "navigation";
+  placement?: "center" | "header" | "navigation" | "task";
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -52,11 +52,13 @@ export function Modal({
   if (!open) return null;
 
   const position =
-    placement === "navigation"
-      ? "inset-y-0 left-0 right-auto m-0 h-dvh w-[min(20rem,calc(100vw-2rem))] max-h-dvh rounded-none"
-      : placement === "header"
-        ? "bottom-auto left-auto right-3 top-[calc(var(--header-height)+0.5rem)] m-0 w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-var(--header-height)-1.5rem)] rounded-lg"
-        : `inset-0 m-auto w-[calc(100%-1.5rem)] max-h-[calc(100dvh-1.5rem)] rounded-xl ${size === "xl" ? "max-w-5xl" : size === "lg" ? "max-w-2xl" : "max-w-lg"}`;
+    placement === "task"
+      ? "inset-y-0 left-auto right-0 m-0 h-dvh max-h-dvh w-full max-w-none rounded-none md:w-[min(64rem,calc(100vw-3rem))]"
+      : placement === "navigation"
+        ? "inset-y-0 left-0 right-auto m-0 h-dvh w-[min(20rem,calc(100vw-2rem))] max-h-dvh rounded-none"
+        : placement === "header"
+          ? "bottom-auto left-auto right-3 top-[calc(var(--header-height)+0.5rem)] m-0 w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100dvh-var(--header-height)-1.5rem)] rounded-lg"
+          : `inset-0 m-auto w-[calc(100%-1.5rem)] max-h-[calc(100dvh-1.5rem)] rounded-xl ${size === "xl" ? "max-w-5xl" : size === "lg" ? "max-w-2xl" : "max-w-lg"}`;
 
   return (
     <dialog
