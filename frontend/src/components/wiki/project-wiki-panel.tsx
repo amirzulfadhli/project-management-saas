@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -18,21 +19,64 @@ import { Textarea } from "@/components/ui/textarea";
 
 const CONTENT_LIMIT = 96 * 1024;
 
-export function ProjectWikiPanel({
-  projectId,
-  canAdminister,
-}: {
+export function ProjectWikiPanel(props: {
   projectId: string;
   canAdminister: boolean;
 }) {
+  const params = useSearchParams();
+  const router = useRouter();
+  const drafts = useWikiDrafts();
+  const recentDraftKey = [...drafts.keys()]
+    .reverse()
+    .find((key) => key.startsWith(props.projectId + ":"));
+  const recentId = recentDraftKey?.slice(props.projectId.length + 1);
+  const requestedId =
+    params.get("page") || (recentId && recentId !== "index" ? recentId : null);
+  const explicitId = params.get("page");
+  useEffect(() => {
+    if (!explicitId && requestedId)
+      router.replace(
+        `/projects/${encodeURIComponent(props.projectId)}/docs?page=${encodeURIComponent(requestedId)}`,
+        { scroll: false },
+      );
+  }, [explicitId, requestedId, props.projectId, router]);
+  return (
+    <WikiPageWorkspace
+      key={`${props.projectId}:${requestedId ?? "index"}`}
+      {...props}
+      requestedId={requestedId}
+    />
+  );
+}
+
+function WikiPageWorkspace({
+  projectId,
+  canAdminister,
+  requestedId,
+}: {
+  projectId: string;
+  canAdminister: boolean;
+  requestedId: string | null;
+}) {
+  const router = useRouter();
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const pageHref = (id: string) =>
+    `/projects/${encodeURIComponent(projectId)}/docs?page=${encodeURIComponent(id)}`;
   const { data: session } = authClient.useSession();
   const userId = session?.user.id ?? null;
   const queryClient = useQueryClient();
   const listKey = queryKeys.wikiPages(projectId, userId);
   const drafts = useWikiDrafts();
-  const savedDraft = drafts.get(projectId);
+  const draftKey = `${projectId}:${requestedId ?? "index"}`;
+  const savedDraft = drafts.get(draftKey);
   const [selectedId, setSelectedId] = useState<string | null>(
-    savedDraft?.selectedId ?? null,
+    savedDraft?.selectedId ?? requestedId,
   );
   const [mode, setMode] = useState<"view" | "edit" | "create">(
     savedDraft?.mode ?? "view",
@@ -52,12 +96,19 @@ export function ProjectWikiPanel({
   const pages = useMemo(() => pagesQuery.data ?? [], [pagesQuery.data]);
   // Never retarget an editing draft to another page when its original disappears.
   const activePageId = selectedId ?? pages[0]?.id ?? null;
+  useEffect(() => {
+    if (!requestedId && activePageId && mode === "view")
+      router.replace(
+        `/projects/${encodeURIComponent(projectId)}/docs?page=${encodeURIComponent(activePageId)}`,
+        { scroll: false },
+      );
+  }, [requestedId, activePageId, mode, projectId, router]);
   const selectedSummary =
     pages.find((page) => page.id === activePageId) ?? null;
   const pageQuery = useQuery({
     queryKey: queryKeys.wikiPage(projectId, activePageId ?? "none", userId),
     queryFn: () => api.getWikiPage(projectId, activePageId!),
-    enabled: Boolean(activePageId),
+    enabled: Boolean(activePageId) && mode !== "create",
   });
 
   const dirty =
@@ -73,9 +124,9 @@ export function ProjectWikiPanel({
   const confirmDiscard = () =>
     !dirty || window.confirm("Discard your unsaved documentation changes?");
   useEffect(() => {
-    if (mode === "view") drafts.delete(projectId);
+    if (mode === "view") drafts.delete(draftKey);
     else
-      drafts.set(projectId, {
+      drafts.set(draftKey, {
         selectedId: activePageId,
         mode,
         createParentId,
@@ -85,7 +136,7 @@ export function ProjectWikiPanel({
       });
   }, [
     drafts,
-    projectId,
+    draftKey,
     activePageId,
     mode,
     createParentId,
@@ -94,10 +145,13 @@ export function ProjectWikiPanel({
     dirty,
   ]);
   const selectPage = (id: string) => {
+    if (mutationPending) return;
     if (!confirmDiscard()) return;
     setMode("view");
     setError(null);
     setSelectedId(id);
+    drafts.delete(draftKey);
+    router.push(pageHref(id), { scroll: false });
   };
   const refresh = async (pageId?: string) => {
     await Promise.all([
@@ -125,9 +179,10 @@ export function ProjectWikiPanel({
         parentId: createParentId,
       }),
     onSuccess: async (page) => {
-      drafts.delete(projectId);
+      drafts.delete(draftKey);
       setMode("view");
       setSelectedId(page.id);
+      if (mounted.current) router.replace(pageHref(page.id), { scroll: false });
       setError(null);
       await refresh(page.id);
     },
@@ -140,7 +195,7 @@ export function ProjectWikiPanel({
         content,
       }),
     onSuccess: async (page) => {
-      drafts.delete(projectId);
+      drafts.delete(draftKey);
       queryClient.setQueryData(
         queryKeys.wikiPage(projectId, page.id, userId),
         page,
@@ -154,7 +209,10 @@ export function ProjectWikiPanel({
   const remove = useMutation({
     mutationFn: () => api.deleteWikiPage(projectId, activePageId!),
     onSuccess: async () => {
+      drafts.delete(draftKey);
       setSelectedId(null);
+      if (mounted.current)
+        router.replace(`/projects/${projectId}/docs`, { scroll: false });
       setMode("view");
       setError(null);
       await refresh();
@@ -179,10 +237,22 @@ export function ProjectWikiPanel({
   });
 
   const tree = useMemo(() => buildTree(pages), [pages]);
+  const mutationPending =
+    create.isPending || update.isPending || remove.isPending || move.isPending;
   const canDelete =
     Boolean(selectedSummary) &&
     (canAdminister || selectedSummary?.createdById === userId);
 
+  const denied =
+    pagesQuery.error instanceof ApiError &&
+    [401, 403, 404].includes(pagesQuery.error.status);
+  if (denied)
+    return (
+      <ErrorState
+        message={errorMessage(pagesQuery.error)}
+        onRetry={() => pagesQuery.refetch()}
+      />
+    );
   return (
     <section aria-label="Project documentation">
       {mode !== "view" && dirty ? (
@@ -192,48 +262,54 @@ export function ProjectWikiPanel({
         </p>
       ) : null}
       <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-[15rem_minmax(0,1fr)]">
-        <aside className="flex min-h-0 flex-col rounded-lg border border-border bg-background/40 p-3">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-              Pages
-            </p>
-            <Button
-              size="sm"
-              onClick={() => {
-                if (!confirmDiscard()) return;
-                setCreateParentId(null);
-                setTitle("");
-                setContent("");
-                setError(null);
-                setMode("create");
-              }}
-            >
-              New
-            </Button>
-          </div>
-          <div className="min-h-0 overflow-y-auto">
-            {pagesQuery.isPending ? (
-              <div className="flex justify-center py-8">
-                <Spinner />
-              </div>
-            ) : pagesQuery.isError ? (
-              <ErrorState
-                message={errorMessage(pagesQuery.error)}
-                onRetry={() => pagesQuery.refetch()}
-              />
-            ) : pages.length === 0 ? (
-              <p className="py-6 text-center text-sm text-text-secondary">
-                No pages yet.
+        <details open className="min-w-0">
+          <summary className="control-target cursor-pointer text-sm font-medium">
+            Document navigation
+          </summary>
+          <aside className="flex min-h-0 flex-col border-r border-border pr-3">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                Pages
               </p>
-            ) : (
-              <WikiTree
-                nodes={tree}
-                selectedId={activePageId}
-                onSelect={selectPage}
-              />
-            )}
-          </div>
-        </aside>
+              <Button
+                size="sm"
+                disabled={mutationPending}
+                onClick={() => {
+                  if (!confirmDiscard()) return;
+                  setCreateParentId(null);
+                  setTitle("");
+                  setContent("");
+                  setError(null);
+                  setMode("create");
+                }}
+              >
+                New
+              </Button>
+            </div>
+            <div className="min-h-0 overflow-y-auto">
+              {pagesQuery.isPending ? (
+                <div className="flex justify-center py-8">
+                  <Spinner />
+                </div>
+              ) : pagesQuery.isError ? (
+                <ErrorState
+                  message={errorMessage(pagesQuery.error)}
+                  onRetry={() => pagesQuery.refetch()}
+                />
+              ) : pages.length === 0 ? (
+                <p className="py-6 text-center text-sm text-text-secondary">
+                  No pages yet.
+                </p>
+              ) : (
+                <WikiTree
+                  nodes={tree}
+                  selectedId={activePageId}
+                  onSelect={selectPage}
+                />
+              )}
+            </div>
+          </aside>
+        </details>
 
         <div className="min-w-0">
           {error ? (
@@ -296,11 +372,18 @@ export function ProjectWikiPanel({
                     {new Date(pageQuery.data.updatedAt).toLocaleString()} ·
                     Created by {pageQuery.data.creator.name}
                   </p>
+                  <a
+                    className="text-xs text-primary hover:underline"
+                    href={pageHref(pageQuery.data.id)}
+                  >
+                    Page link
+                  </a>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     variant="secondary"
+                    disabled={mutationPending}
                     onClick={() => {
                       setCreateParentId(pageQuery.data.id);
                       setTitle("");
@@ -313,6 +396,7 @@ export function ProjectWikiPanel({
                   <Button
                     size="sm"
                     variant="secondary"
+                    disabled={mutationPending}
                     onClick={() => {
                       setTitle(pageQuery.data.title);
                       setContent(pageQuery.data.content);
@@ -326,7 +410,7 @@ export function ProjectWikiPanel({
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={remove.isPending}
+                      disabled={mutationPending}
                       onClick={() => {
                         if (
                           window.confirm(
@@ -346,7 +430,7 @@ export function ProjectWikiPanel({
                 <select
                   className="mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary"
                   value={pageQuery.data.parentId ?? ""}
-                  disabled={move.isPending}
+                  disabled={mutationPending}
                   onChange={(event) => move.mutate(event.target.value || null)}
                 >
                   <option value="">Top level</option>
@@ -410,6 +494,7 @@ function WikiEditor({
         <Input
           id="wiki-title"
           value={title}
+          disabled={pending}
           maxLength={200}
           onChange={(event) => onTitle(event.target.value)}
         />
@@ -429,6 +514,7 @@ function WikiEditor({
         <Textarea
           id="wiki-content"
           value={content}
+          disabled={pending}
           rows={18}
           maxLength={CONTENT_LIMIT}
           className="font-mono text-sm"
@@ -519,6 +605,7 @@ function WikiTree({
           <button
             type="button"
             onClick={() => onSelect(node.id)}
+            aria-current={selectedId === node.id ? "page" : undefined}
             className={`w-full truncate rounded-md px-2 py-1.5 text-left text-sm ${selectedId === node.id ? "bg-primary/10 font-medium text-primary" : "text-text-secondary hover:bg-hover hover:text-text-primary"}`}
             style={{ paddingLeft: `${8 + depth * 14}px` }}
             title={node.title}

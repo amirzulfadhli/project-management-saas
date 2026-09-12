@@ -102,6 +102,17 @@ also removes its link.
 
 ## Verification and limitations
 
+Phase D refines the existing UI only: connection administration sits under
+**Manage connection** for owners; Issue import requires choosing a Column.
+Paginating the Task Issue chooser clears selection. Returned repository identity
+must match the current connection before linking/importing; backend verification
+is unchanged and remains authoritative. Legacy connections do not attempt Issue
+discovery. UI copy explicitly distinguishes linking without immediate Task
+rewrite from later inbound title/body sync, and excludes automatic Column moves
+or outbound Task edits. Repository changes invalidate affected Project discovery
+and the current user's known linked-Task caches. No new GitHub requests,
+permissions, token exposure or synchronization semantics are introduced.
+
 Automated GitHub tests use deterministic mocked GitHub HTTP responses and real
 PostgreSQL. They cover discovery, authorization, strict DTOs, link/import,
 concurrent conflicts, repository isolation, signed/idempotent webhook updates,

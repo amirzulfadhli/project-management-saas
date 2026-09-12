@@ -131,6 +131,27 @@ test("Task events reconcile only the matching detail, and deletion cancels an in
   });
   expect(view.client.getQueryData(key)).toBeNull();
 });
+test("repository changes invalidate known same-user links only in the affected Project", async () => {
+  const view = setup();
+  await screen.findByText("Private Docs");
+  const own = queryKeys.taskGithubIssue("task-a", "user-a");
+  const otherUser = queryKeys.taskGithubIssue("task-a", "other-user");
+  const otherProject = queryKeys.taskGithubIssue("task-b", "user-a");
+  view.client.setQueryData(own, { projectId: "project-a" });
+  view.client.setQueryData(otherUser, { projectId: "project-a" });
+  view.client.setQueryData(otherProject, { projectId: "project-b" });
+  await act(async () =>
+    mockHandlers.get("project:event")?.({
+      entity: "repository",
+      type: "GITHUB_REPOSITORY_DISCONNECTED",
+      projectId: "project-a",
+    }),
+  );
+  expect(view.client.getQueryState(own)?.isInvalidated).toBe(true);
+  expect(view.client.getQueryState(otherUser)?.isInvalidated).toBe(false);
+  expect(view.client.getQueryState(otherProject)?.isInvalidated).toBe(false);
+});
+
 test("member events reconcile shared permissions and final access revocation hides resources", async () => {
   const view = setup();
   await screen.findByText("Private Docs");

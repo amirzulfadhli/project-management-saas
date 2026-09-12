@@ -68,8 +68,12 @@ timestamp to the recipient room; it is never broadcast to a Project room.
 The application header contains a keyboard-accessible bell, a visible
 **Notifications** label at normal desktop widths, and an unread badge.
 Its responsive panel lists newest items first, supports cursor-based “Load
-more”, individual read, mark-all-read, retry/error/empty states, and Project
-navigation. Unknown or deleted targets degrade to stable historical messages.
+more”, independent individual read, mark-all-read, and retry/error/empty states.
+Opening awaits read persistence before navigating to the Task when an existing
+Task ID (including Comment metadata) is available, otherwise to the Project.
+Deleted targets retain historical messages and use the existing unavailable-Task
+surface. Failed read actions do not navigate. Transient next-page errors retain
+loaded rows; authorization failures hide them. List queries remain lazy until open.
 Realtime events invalidate only the inbox and unread-count caches.
 Individual and bulk read actions persist `readAt` through the authenticated
 backend; refresh and account switching never depend on client-only read state.
@@ -77,8 +81,8 @@ backend; refresh and account switching never depend on client-only read state.
 ## Intentional limitations
 
 There are no email, browser/mobile push, digests, preferences, per-event mute,
-scheduled jobs, Redis, or BullMQ. Navigation targets the containing Project
-rather than opening a Task/Comment deep link. Manual notification discovery,
+scheduled jobs, Redis, or BullMQ. Comment links open the Task, not a specific
+Comment anchor. Manual notification discovery,
 read-state refresh, and two-account isolation must be retested after V1 manual
 QA defect closure 1; automated verification does not claim that acceptance.
 

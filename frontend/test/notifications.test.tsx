@@ -1,7 +1,13 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/queries";
 import type { NotificationItem } from "@/lib/types";
 
@@ -12,7 +18,7 @@ jest.mock("@/lib/auth-client", () => ({
   authClient: { useSession: () => ({ data: { user: { id: mockUserId } } }) },
 }));
 jest.mock("@/lib/api", () => ({
-  ApiError: class extends Error {},
+  ApiError: jest.requireActual("@/lib/api").ApiError,
   api: {
     getNotifications: jest.fn(),
     getNotificationUnreadCount: jest.fn(),
@@ -74,7 +80,7 @@ test("count loads while the private list remains lazy until opened", async () =>
   expect(document.activeElement).toBe(trigger);
 });
 
-test("read persistence is awaited before existing Project navigation", async () => {
+test("read persistence is awaited before exact Task navigation", async () => {
   jest
     .mocked(api.markNotificationRead)
     .mockResolvedValue({ id: notification.id, readAt: "2026-09-11T01:00:00Z" });
@@ -86,7 +92,7 @@ test("read persistence is awaited before existing Project navigation", async () 
     await screen.findByText("Daniel assigned you to Session recovery"),
   );
   await waitFor(() =>
-    expect(mockPush).toHaveBeenCalledWith("/projects/project-a"),
+    expect(mockPush).toHaveBeenCalledWith("/projects/project-a/tasks/task-a"),
   );
   expect(api.markNotificationRead).toHaveBeenCalledWith(
     "notification-a",
@@ -199,4 +205,119 @@ test("unread-count failure is not presented as an authoritative zero", async () 
   );
   expect(screen.getByText("Unread count unavailable")).toBeTruthy();
   expect(screen.queryByText("0 unread")).toBeNull();
+});
+
+test("individual read persists without closing or navigating", async () => {
+  jest.mocked(api.markNotificationRead).mockImplementation(async () => {
+    jest.mocked(api.getNotifications).mockResolvedValue({
+      items: [{ ...notification, readAt: "2026-09-12T00:00:00Z" }],
+      nextCursor: null,
+    });
+    jest.mocked(api.getNotificationUnreadCount).mockResolvedValue({ count: 0 });
+    return { id: notification.id, readAt: "2026-09-12T00:00:00Z" };
+  });
+  setup();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Notifications, 1 unread" }),
+  );
+  fireEvent.click(await screen.findByRole("button", { name: /^Mark read:/ }));
+  await screen.findByText("Read", { exact: true });
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  expect(mockPush).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Close Notifications" }));
+  fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
+  await screen.findByText("Read", { exact: true });
+});
+
+test.each([
+  [
+    "comment",
+    "comment-a",
+    { taskId: "task-b", taskTitle: "Discussion" },
+    "/projects/project-a/tasks/task-b",
+  ],
+  ["comment", "comment-a", { taskTitle: "Discussion" }, "/projects/project-a"],
+  ["project-member", "member-a", {}, "/projects/project-a"],
+] as const)(
+  "%s navigation uses only reliable existing identity",
+  async (entityType, entityId, metadata, destination) => {
+    jest.mocked(api.getNotifications).mockResolvedValue({
+      items: [
+        {
+          ...notification,
+          entityType,
+          entityId,
+          metadata,
+          readAt: "2026-09-12T00:00:00Z",
+        },
+      ],
+      nextCursor: null,
+    });
+    setup();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Notifications, 1 unread" }),
+    );
+    fireEvent.click(await screen.findByText(/Daniel assigned/));
+    expect(mockPush).toHaveBeenCalledWith(destination);
+  },
+);
+
+test("next-page failure preserves loaded notifications and permits retry", async () => {
+  jest
+    .mocked(api.getNotifications)
+    .mockResolvedValueOnce({ items: [notification], nextCursor: "next" })
+    .mockRejectedValueOnce(new Error("Network"))
+    .mockResolvedValue({ items: [], nextCursor: null });
+  setup();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Notifications, 1 unread" }),
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
+  await screen.findByText("Could not load more notifications.");
+  expect(
+    screen.getByText("Daniel assigned you to Session recovery"),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull(),
+  );
+});
+
+test("next-page authorization failure hides previously loaded private notifications", async () => {
+  jest
+    .mocked(api.getNotifications)
+    .mockResolvedValueOnce({ items: [notification], nextCursor: "next" })
+    .mockRejectedValueOnce(new ApiError(403, "Access denied", {}));
+  setup();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Notifications, 1 unread" }),
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
+  await screen.findByText("Access denied");
+  expect(
+    screen.queryByText("Daniel assigned you to Session recovery"),
+  ).toBeNull();
+});
+
+test("a read response after account teardown cannot navigate the new session", async () => {
+  let resolveRead!: (value: { id: string; readAt: string }) => void;
+  jest.mocked(api.markNotificationRead).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        resolveRead = resolve;
+      }),
+  );
+  const { unmount } = setup();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Notifications, 1 unread" }),
+  );
+  fireEvent.click(
+    await screen.findByText("Daniel assigned you to Session recovery"),
+  );
+  await waitFor(() => expect(api.markNotificationRead).toHaveBeenCalled());
+  unmount();
+  await act(async () => {
+    resolveRead({ id: notification.id, readAt: "2026-09-12T00:00:00Z" });
+  });
+  expect(mockPush).not.toHaveBeenCalled();
 });

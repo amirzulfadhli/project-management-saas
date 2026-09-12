@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { taskHref } from "@/lib/task-links";
 import { useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
@@ -58,7 +60,11 @@ export function ProjectActivityPanel({ projectId }: { projectId: string }) {
           >
             <Spinner /> Loading activity...
           </div>
-        ) : activityQuery.isError && activities.length === 0 ? (
+        ) : activityQuery.isError &&
+          (activities.length === 0 ||
+            !activityQuery.isFetchNextPageError ||
+            (activityQuery.error instanceof ApiError &&
+              [401, 403, 404].includes(activityQuery.error.status))) ? (
           <ErrorState
             message={activityErrorMessage(
               activityQuery.error,
@@ -141,9 +147,13 @@ function ActivityRow({ activity }: { activity: ActivityItem }) {
             {formatActivityTimestamp(activity.createdAt)}
           </time>
           {activity.task ? (
-            <span className="max-w-full truncate" title={activity.task.title}>
+            <Link
+              prefetch={false}
+              href={taskHref(activity.projectId, activity.task.id)}
+              className="max-w-full break-words text-primary hover:underline"
+            >
               Task: {activity.task.title}
-            </span>
+            </Link>
           ) : null}
         </div>
       </div>

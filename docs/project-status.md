@@ -90,8 +90,33 @@ inside the collapsed manual-time disclosure; the affected detail suite passes
 Prettier, production build and `git diff --check` pass.
 No backend, migration, database or dependency changes. Historical backend and
 PostgreSQL counts above were not rerun for this frontend-only phase.
-**PHASE C MANUAL UI ACCEPTANCE: PENDING. Phase D has not begun.**
+**PHASE C MANUAL UI ACCEPTANCE: PENDING.**
 V1 functional freeze remains reopened.
+
+### UI refinement Phase D
+
+Resource and collaboration refinement is implemented: independent Notification
+read actions and reliable Task/Project destinations; URL-selected Docs with
+page-scoped session drafts; clear Project/Task file scope and recoverable paging;
+live Task links from Activity; compact completed Time totals and active-timer
+Task navigation; separated GitHub connection administration, explicit import
+Column selection and accurate inbound-sync semantics.
+
+Repository disconnect/replacement now reconciles the current user's known Task
+Issue links in the affected Project. Cross-Organization Task sheets derive
+authority from their accessible target Organization without changing the
+background selection. Denied resource refetches hide protected cached content.
+Backend authorization remains authoritative; no API, backend, schema, database,
+dependency or Board drag-and-drop contract changes are included.
+
+See [UI refinement](ui-refinement.md#phase-d--resource-and-collaboration-experience)
+for implementation boundaries and the manual checklist.
+The full frontend suite passes **118/118 in 13 suites**; after a final Docs
+save-in-flight guard, affected resource suites pass **25/25 in 2 suites**.
+TypeScript, ESLint, changed-file Prettier, production build and
+`git diff --check` pass. Historical backend/PostgreSQL results were not rerun.
+**PHASE D MANUAL UI ACCEPTANCE: PENDING. Phase E has not begun.**
+V1 functional freeze remains reopened; no live GitHub/browser acceptance is claimed.
 
 ### Previous defect-closure verification
 

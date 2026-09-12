@@ -134,14 +134,28 @@ export function AttachmentsPanel({
     upload.mutate(file);
   };
 
+  const unavailable =
+    attachmentsQuery.error instanceof ApiError &&
+    [401, 403, 404].includes(attachmentsQuery.error.status);
+  if (unavailable)
+    return (
+      <ErrorState
+        message={messageFor(attachmentsQuery.error, "Attachments unavailable.")}
+        onRetry={() => attachmentsQuery.refetch()}
+      />
+    );
+
   return (
     <section className="space-y-4" aria-label="Attachments">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h3 className="text-sm font-semibold text-text-primary">
-            Attachments
+            {scope === "project" ? "Project attachments" : "Task attachments"}
           </h3>
           <p className="mt-0.5 text-xs text-text-secondary">
+            {scope === "project"
+              ? "Files attached directly to this Project. Task files remain on their Tasks."
+              : "Files attached to this Task, available to its Project collaborators."}{" "}
             PNG, JPG, WebP, PDF, TXT, or CSV up to 10 MB.
           </p>
         </div>
@@ -167,6 +181,25 @@ export function AttachmentsPanel({
         </p>
       ) : null}
 
+      {attachmentsQuery.isError && attachments.length > 0 ? (
+        <p role="alert" className="text-sm text-danger">
+          {messageFor(
+            attachmentsQuery.error,
+            "Could not refresh files. Previously loaded files are shown.",
+          )}{" "}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              attachmentsQuery.isFetchNextPageError
+                ? attachmentsQuery.fetchNextPage()
+                : attachmentsQuery.refetch()
+            }
+          >
+            Retry
+          </Button>
+        </p>
+      ) : null}
       {attachmentsQuery.isPending ? (
         <div
           className="flex items-center justify-center gap-2 py-10 text-sm text-text-secondary"
@@ -207,12 +240,13 @@ export function AttachmentsPanel({
                 >
                   <div className="min-w-0 flex-1">
                     <p
-                      className="truncate text-sm font-medium text-text-primary"
+                      className="break-words text-sm font-medium text-text-primary"
                       title={attachment.originalName}
                     >
                       {attachment.originalName}
                     </p>
                     <p className="mt-0.5 text-xs text-text-secondary">
+                      {attachment.mimeType} ·{" "}
                       {formatBytes(attachment.sizeBytes)} ·{" "}
                       {attachment.uploader.name} ·{" "}
                       <time dateTime={attachment.createdAt}>

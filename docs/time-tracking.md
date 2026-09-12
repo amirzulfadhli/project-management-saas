@@ -81,6 +81,12 @@ browser retesting remains required after the first V1 QA defect-closure pass.
 
 ## Known limitations
 
+Phase D explicitly labels Project totals as completed entries only. A timer
+active elsewhere names and links its exact Task, including across Organizations,
+without stopping or replacing it. Failed active-timer reads are not interpreted
+as permission to start another timer. Existing private history and owner-only
+aggregate visibility remain unchanged; no global eager timer polling is added.
+
 - Running elapsed time is presented from its start timestamp but is not a
   continuously synchronized server counter.
 - Completed entries cannot yet be edited or deleted.

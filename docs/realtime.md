@@ -152,3 +152,12 @@ a loaded Board list. TASK_DELETED cancels the matching in-flight detail query
 before storing a null tombstone, preventing a stale response from restoring it.
 No new backend events or payload fields are introduced. Manual two-client
 acceptance is still pending; frontend contract tests are not browser acceptance.
+
+### Phase D resource reconciliation
+
+Existing repository events also invalidate Issue discovery and the current user's
+known Task Issue-link snapshots in that Project. This reflects disconnect's
+existing removal of Issue links while preserving Tasks. Other users/Projects are
+not invalidated by this helper. Resource scopes, private Notification delivery,
+session connection ownership and reconnect behavior remain intact. No new server
+events or payloads are added; two-client browser acceptance remains pending.

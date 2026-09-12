@@ -205,7 +205,9 @@ export function ProjectMembersPanel({
       <div className="min-w-0 space-y-5">
         <p className="text-sm text-text-secondary">
           This roster records Project roles. Organization members may also have
-          inherited Project access without appearing here.
+          inherited Project access without appearing here. Removing an explicit
+          Project role does not remove Organization access. Project roles and
+          Organization ownership are separate.
         </p>
 
         {membersQuery.isPending ? (

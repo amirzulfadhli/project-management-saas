@@ -21,14 +21,20 @@ export function ProjectGithubIssues({
   projectId,
   columns,
   currentUserId,
+  repositoryId,
 }: {
   projectId: string;
   columns: Column[];
   currentUserId: string | null;
+  repositoryId?: string;
 }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  const [columnId, setColumnId] = useState(columns[0]?.id ?? "");
+  const [columnId, setColumnId] = useState("");
+  const destination =
+    columns.find(
+      (column) => column.projectId === projectId && column.id === columnId,
+    )?.id ?? "";
   const [error, setError] = useState<string | null>(null);
   const issues = useQuery({
     queryKey: queryKeys.githubIssues(
@@ -47,7 +53,7 @@ export function ProjectGithubIssues({
   });
   const createTask = useMutation({
     mutationFn: (issueNumber: number) =>
-      api.createTaskFromGithubIssue(projectId, issueNumber, columnId),
+      api.createTaskFromGithubIssue(projectId, issueNumber, destination),
     onSuccess: async ({ task }) => {
       queryClient.setQueryData<Task[]>(queryKeys.tasks(projectId), (current) =>
         [...(current ?? []).filter((item) => item.id !== task.id), task].sort(
@@ -90,6 +96,14 @@ export function ProjectGithubIssues({
     );
   }
 
+  if (repositoryId && issues.data?.repository.id !== repositoryId)
+    return (
+      <ErrorState
+        message="The repository connection changed. Reload Issues before importing."
+        onRetry={() => issues.refetch()}
+      />
+    );
+
   return (
     <section
       className="space-y-3 border-t border-border pt-5"
@@ -99,8 +113,10 @@ export function ProjectGithubIssues({
         <div>
           <h3 className="text-sm font-medium text-text-primary">Open Issues</h3>
           <p className="mt-1 text-xs text-text-secondary">
-            Explicitly import an Issue as a Task. Webhooks never create Tasks
-            automatically.
+            Explicitly import an Issue as a Task. Import initializes title and
+            description from GitHub. Later inbound sync may replace them; GitHub
+            state does not move Columns and FlowPlan edits are never pushed to
+            GitHub. Webhooks never create Tasks automatically.
           </p>
         </div>
         <div className="w-full sm:w-52">
@@ -113,14 +129,18 @@ export function ProjectGithubIssues({
           <Select
             id="github-import-column"
             className="mt-1"
-            value={columnId}
+            value={destination}
+            disabled={createTask.isPending}
             onChange={(event) => setColumnId(event.target.value)}
           >
-            {columns.map((column) => (
-              <option key={column.id} value={column.id}>
-                {column.name}
-              </option>
-            ))}
+            <option value="">Choose a Column</option>
+            {columns
+              .filter((column) => column.projectId === projectId)
+              .map((column) => (
+                <option key={column.id} value={column.id}>
+                  {column.name}
+                </option>
+              ))}
           </Select>
         </div>
       </div>
@@ -169,7 +189,9 @@ export function ProjectGithubIssues({
                 size="sm"
                 className="shrink-0"
                 disabled={
-                  Boolean(issue.linkedTask) || !columnId || createTask.isPending
+                  Boolean(issue.linkedTask) ||
+                  !destination ||
+                  createTask.isPending
                 }
                 onClick={() => createTask.mutate(issue.number)}
               >

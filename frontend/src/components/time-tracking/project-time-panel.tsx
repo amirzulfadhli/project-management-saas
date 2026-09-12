@@ -38,7 +38,11 @@ export function ProjectTimePanel({ projectId }: { projectId: string }) {
           />
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <p className="text-sm text-text-secondary">
+              Completed entries only. Running timers are excluded; individual
+              notes remain private.
+            </p>
+            <div className="flex flex-wrap gap-x-10 gap-y-3 border-b border-border pb-4">
               <Metric
                 label="Project total"
                 value={formatDuration(summary.data.totalSeconds)}
@@ -111,11 +115,11 @@ export function ProjectTimePanel({ projectId }: { projectId: string }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border bg-background/40 p-4">
+    <div className="min-w-0">
       <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
         {label}
       </p>
-      <p className="mt-1 text-2xl font-semibold text-text-primary">{value}</p>
+      <p className="mt-1 text-xl font-semibold text-text-primary">{value}</p>
     </div>
   );
 }

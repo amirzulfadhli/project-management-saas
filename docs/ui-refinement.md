@@ -1,9 +1,9 @@
-# UI refinement — Phases A, B and C
+# UI refinement — Phases A–D
 
 Phase A implements the approved shell, navigation, spacing and interaction
 foundation. Phase B adds the persistent Project workspace described below.
 Phase C adds reading-first Task detail and Board interaction refinement.
-Resource-experience refinement (Phase D) has **not** started.
+Phase D refines resource and collaboration workflows. Phase E has not started.
 
 ## Implemented
 
@@ -41,11 +41,11 @@ and dialogs have viewport bounds using dynamic viewport units.
 
 Notifications use this same primitive in a compact header panel. The existing
 private list/count keys, lazy list loading, pagination, read/read-all endpoints,
-Project navigation destination and realtime invalidation remain unchanged.
+realtime invalidation remain unchanged. Phase D adds the navigation refinements below.
 Read/unread labels supplement color. Count failure is not presented as zero.
 A failed mark-read keeps its error visible instead of closing and navigating.
-Separate item actions, new categories, inbox routes and preference controls are
-not introduced.
+Phase A did not introduce separate item actions. Phase D adds independent read
+actions; new categories, inbox routes and preference controls remain excluded.
 
 ## Verification boundary
 
@@ -286,3 +286,75 @@ Required manual retest:
 No browser automation/manual acceptance, backend/schema/database changes,
 new dependencies, or Phase D implementation were performed.
 Functional freeze remains reopened pending manual acceptance.
+
+## Phase D — Resource and collaboration experience
+
+Existing Project sections are refined without new domains, endpoints, schema,
+dependencies or backend changes. Phase A–C navigation and Task/Board contracts
+remain in place.
+
+- Notifications have independent **Mark read** actions. Opening still awaits
+  persisted read state, then follows an existing Task identifier (or a Comment's
+  existing Task metadata); otherwise it opens the Project. Read errors keep the
+  panel open. Pagination retains loaded items on transient next-page failure,
+  but authorization failure hides cached inbox content. A late read response
+  after session teardown cannot navigate the new session. List loading stays lazy.
+- Docs selection uses `/projects/:id/docs?page=:pageId`, with a collapsible
+  document navigator and shareable page link. Drafts are keyed by Project/page
+  in account-scoped memory; history restores the matching draft, and returning
+  to bare Docs resumes the most recently retained draft. Page selection/Cancel
+  keep discard confirmation. Only the selected body is fetched; new-page mode
+  does not fetch another body. Pending editor inputs and local edit transitions
+  are disabled so an earlier save cannot clear a newly started draft. Late creation
+  responses clear saved drafts without redirecting a different section. Access
+  denial hides cached content and controls. Markdown security is unchanged.
+- Files distinguish Project-only and Task-only collections, wrap filenames and
+  display type/size/uploader/date. Existing authenticated transfers and confirmed
+  authorized deletion remain intact. Transient pagination errors retain rows and
+  offer Retry; access denial removes cached rows and upload controls.
+- Activity links only existing live Task relations. Deleted targets stay history,
+  without per-row existence requests. Pagination remains bounded and recoverable.
+  Task Comments use the surrounding detail scroll instead of a nested scroller.
+- Time distinguishes completed totals from running timers. An active timer on
+  another Task names and links that Task; it never silently starts a second
+  timer. Project totals and the caller's contribution are compact, with existing
+  owner-only breakdowns supplied by the backend. No notes become public.
+- GitHub separates owner connection management from Issue work. Import requires
+  explicit destination Column selection. Link selection clears on pagination;
+  mismatched repository snapshots cannot be used. Legacy connections do not
+  initiate unsupported Issue discovery. Copy explains no initial Task rewrite
+  on linking, later inbound title/body replacement, no automatic Column moves,
+  and no outbound Task-edit sync. Disconnect preserves Tasks but removes links.
+- Repository changes invalidate only the current user's known Issue links in
+  the affected Project plus its discovery queries. Cross-Organization Task
+  sheets load target Organization authority only when that Organization remains
+  accessible, without switching the background workspace. Membership copy
+  distinguishes explicit Project roles from inherited Organization access.
+
+No new Notifications, eager global timer polling, public files, generic resource
+graph, durable drafts, or write-conflict architecture is introduced. Same-field
+Task and Wiki edits still follow their existing last-committed-write semantics.
+
+### Phase D automated verification
+
+The full frontend suite passed **118/118 tests in 13 suites**. Final review
+then protected Docs local edit transitions during a pending save and strengthened
+its regression assertion; the affected resource suites pass **25/25 in 2 suites**.
+TypeScript, ESLint, changed-file Prettier, the production build with local
+`NEXT_PUBLIC_API_URL=http://localhost:3001`, and `git diff --check` pass.
+Tests cover private read persistence and late responses, resource paging/errors,
+Docs URL/draft isolation, repository cache scope, explicit import selection,
+cross-Organization authority and retained A–C workflows. Backend/PostgreSQL
+suites were not rerun: their code, schemas and contracts are unchanged.
+
+### Phase D manual acceptance — pending
+
+Retest desktop and approximately 390px: Notifications read/open/read-all,
+pagination failure/retry and account switching; Docs direct links, refresh,
+Back/Forward, section changes, dirty discard and late saves; Project/Task file
+transfers and denied access; Activity historical links; active timer navigation
+between Organizations; explicit GitHub import/link/unlink/disconnect and inbound
+sync. Two clients must exercise membership changes, access loss and reconnect.
+Recheck Phase C sheet history, native focus and Board pointer/keyboard/touch drag.
+Component tests do not substitute for these browser checks. Live GitHub remains
+blocked on public HTTPS/live App credentials. Functional freeze is not restored.

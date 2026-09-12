@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/queries";
+import { invalidateGithubResources } from "@/lib/github-cache";
 import type {
   Column,
   GithubInstallation,
@@ -193,6 +194,7 @@ export function ProjectGithubPanel({
       );
       setMutationError(null);
       setNotice(`${repository.fullName} is connected.`);
+      await invalidateGithubResources(queryClient, projectId, currentUserId);
       await queryClient.invalidateQueries({
         queryKey: queryKeys.projectActivities(projectId),
         exact: true,
@@ -215,6 +217,7 @@ export function ProjectGithubPanel({
       );
       setMutationError(null);
       setNotice("The GitHub repository was disconnected from this Project.");
+      await invalidateGithubResources(queryClient, projectId, currentUserId);
       await queryClient.invalidateQueries({
         queryKey: queryKeys.projectActivities(projectId),
         exact: true,
@@ -477,26 +480,41 @@ function ConnectedRepository({
             </p>
           </div>
           {canAdminister ? (
-            <Button
-              variant="danger"
-              size="sm"
-              disabled={disconnectPending}
-              onClick={onDisconnect}
-            >
-              {disconnectPending ? "Disconnecting..." : "Disconnect"}
-            </Button>
+            <details>
+              <summary className="control-target cursor-pointer text-sm">
+                Manage connection
+              </summary>
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={disconnectPending}
+                onClick={onDisconnect}
+              >
+                {disconnectPending ? "Disconnecting..." : "Disconnect"}
+              </Button>
+            </details>
           ) : null}
         </div>
       </div>
       <p className="text-xs leading-5 text-text-secondary">
-        Disconnecting removes only FlowPlan&apos;s Project connection. It does
-        not delete GitHub data or historical FlowPlan Activity.
+        Disconnecting removes FlowPlan&apos;s Project connection and Issue
+        links, preserving Tasks. It does not delete GitHub data or historical
+        FlowPlan Activity.
       </p>
-      <ProjectGithubIssues
-        projectId={projectId}
-        columns={columns}
-        currentUserId={currentUserId}
-      />
+      {repository.installationId ? (
+        <ProjectGithubIssues
+          key={repository.id}
+          repositoryId={repository.id}
+          projectId={projectId}
+          columns={columns}
+          currentUserId={currentUserId}
+        />
+      ) : (
+        <p className="text-sm text-text-secondary">
+          Issue discovery requires a verified GitHub App connection. An owner
+          can manage this legacy connection.
+        </p>
+      )}
     </div>
   );
 }

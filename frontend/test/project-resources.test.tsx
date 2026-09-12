@@ -11,7 +11,7 @@ import {
   type ProjectResource,
 } from "@/components/projects/project-resource-page";
 import { WikiDraftProvider } from "@/components/wiki/wiki-drafts";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/queries";
 import { column, projectFixture } from "./project-fixtures";
 import type { WikiPage, WikiPageSummary } from "@/lib/types";
@@ -31,7 +31,12 @@ jest.mock("@/components/organizations/organization-provider", () => ({
 jest.mock("@/lib/auth-client", () => ({
   authClient: { useSession: () => ({ data: { user: { id: "user-a" } } }) },
 }));
-jest.mock("next/navigation", () => ({ useRouter: () => ({}) }));
+const mockRouter = { push: jest.fn(), replace: jest.fn() };
+let mockSearch = "";
+jest.mock("next/navigation", () => ({
+  useRouter: () => mockRouter,
+  useSearchParams: () => new URLSearchParams(mockSearch),
+}));
 // Markdown parsing/security is unchanged; these tests exercise routing and editor state.
 jest.mock("react-markdown", () => ({
   __esModule: true,
@@ -57,6 +62,7 @@ function setup(section: ProjectResource) {
   return { client, tree, ...render(tree(section)) };
 }
 beforeEach(() => {
+  mockSearch = "";
   jest
     .spyOn(api, "getProjectAttachments")
     .mockResolvedValue({ items: [], nextCursor: null });
@@ -217,4 +223,100 @@ test("an editing draft never retargets to a different page after its original is
     "My changes",
   );
   expect(api.getWikiPage).not.toHaveBeenCalledWith("project-a", "second");
+});
+
+test("Docs URL selection and browser history retain separate page drafts", async () => {
+  mockSearch = "page=wiki-a";
+  jest.spyOn(api, "getWikiPage").mockImplementation(
+    async (_project, id) =>
+      ({
+        id,
+        projectId: "project-a",
+        title: id,
+        content: "original",
+        creator: { name: "Sarah" },
+      }) as WikiPage,
+  );
+  const view = setup("docs");
+  fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+  fireEvent.change(screen.getByLabelText("Markdown"), {
+    target: { value: "A draft" },
+  });
+  mockSearch = "page=wiki-b";
+  view.rerender(view.tree("docs"));
+  await screen.findByRole("heading", { name: "wiki-b" });
+  expect(screen.queryByDisplayValue("A draft")).toBeNull();
+  expect(
+    screen.getByRole("link", { name: "Page link" }).getAttribute("href"),
+  ).toBe("/projects/project-a/docs?page=wiki-b");
+  mockSearch = "page=wiki-a";
+  view.rerender(view.tree("docs"));
+  expect(
+    ((await screen.findByLabelText("Markdown")) as HTMLTextAreaElement).value,
+  ).toBe("A draft");
+  view.rerender(view.tree(null));
+  mockSearch = "";
+  view.rerender(view.tree("docs"));
+  expect(
+    ((await screen.findByLabelText("Markdown")) as HTMLTextAreaElement).value,
+  ).toBe("A draft");
+  expect(mockRouter.replace).toHaveBeenCalledWith(
+    "/projects/project-a/docs?page=wiki-a",
+    { scroll: false },
+  );
+});
+
+test("denied Docs refetch hides cached document and mutation controls", async () => {
+  mockSearch = "page=wiki-a";
+  jest.spyOn(api, "getWikiPage").mockResolvedValue({
+    id: "wiki-a",
+    title: "Private page",
+    content: "Secret body",
+    creator: { name: "Sarah" },
+  } as WikiPage);
+  const view = setup("docs");
+  await screen.findByText("Secret body");
+  jest
+    .mocked(api.getWikiPages)
+    .mockRejectedValue(new ApiError(403, "Denied", {}));
+  await act(async () => {
+    await view.client.invalidateQueries({
+      queryKey: queryKeys.wikiPages("project-a", "user-a"),
+    });
+  });
+  await screen.findByText(
+    "You do not have access to this Project documentation.",
+  );
+  expect(screen.queryByText("Secret body")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+});
+
+test("a Docs create response after section navigation clears its draft without redirecting", async () => {
+  let finish!: (page: WikiPage) => void;
+  jest.spyOn(api, "createWikiPage").mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const view = setup("docs");
+  await screen.findByText("No pages yet.");
+  fireEvent.click(screen.getByRole("button", { name: "New" }));
+  fireEvent.change(screen.getByLabelText("Title"), {
+    target: { value: "New document" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(api.createWikiPage).toHaveBeenCalled());
+  expect(
+    (screen.getByRole("button", { name: "New" }) as HTMLButtonElement).disabled,
+  ).toBe(true);
+  view.rerender(view.tree(null));
+  mockRouter.replace.mockClear();
+  await act(async () => {
+    finish({ id: "new-page" } as WikiPage);
+  });
+  expect(mockRouter.replace).not.toHaveBeenCalled();
+  view.rerender(view.tree("docs"));
+  await screen.findByText("No pages yet.");
+  expect(screen.queryByLabelText("Title")).toBeNull();
 });

@@ -219,7 +219,7 @@ export function TaskComments({
         </p>
       ) : null}
 
-      <div className="max-h-[42vh] overflow-y-auto pr-1">
+      <div className="min-w-0">
         {comments.length === 0 ? (
           <EmptyState
             title="No Comments yet"
@@ -246,7 +246,7 @@ export function TaskComments({
                       : "min-w-0"
                   }
                 >
-                  <article className="rounded-md border border-border bg-background px-3 py-3">
+                  <article className="border-b border-border py-3">
                     {comment.parentId ? (
                       <p className="mb-2 truncate text-xs text-text-secondary">
                         Reply to {parent?.author.name ?? "an earlier Comment"}

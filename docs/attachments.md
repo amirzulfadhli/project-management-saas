@@ -135,6 +135,12 @@ Attachments intentionally create no Notifications.
 
 ## Frontend and verification status
 
+Phase D labels Project-only versus Task-only attachment collections explicitly;
+the Project list is not an aggregate of all Task files. Filenames wrap and rows
+show MIME type, size, uploader and timestamp. Transient paging failures preserve
+loaded rows and permit retry; authorization failures hide cached rows and upload
+controls. No public URL, changed download contract, or eager file transfer is added.
+
 The Project Files page and Task attachment surface reuse the existing button, empty/error, and
 TanStack Query patterns. They provide upload pending state, deterministic
 pagination, authorized delete confirmation, authenticated download, compact

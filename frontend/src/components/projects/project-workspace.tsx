@@ -78,6 +78,23 @@ export function ProjectWorkspace({
   const projectOrganizationIsSelectable = organizations.some(
     (organization) => organization.id === projectOrganizationId,
   );
+  // A Task sheet may belong to another Organization (for example an active timer).
+  // Load that selectable Organization without changing the background workspace.
+  const sheetOrganization = useQuery({
+    queryKey: queryKeys.organization(projectOrganizationId ?? "none"),
+    queryFn: () => api.getOrganization(projectOrganizationId!),
+    enabled:
+      compact &&
+      projectOrganizationIsSelectable &&
+      projectOrganizationId !== selectedOrganizationId &&
+      !project.isError,
+  });
+  const permissionOrganization =
+    selectedOrganization?.id === projectOrganizationId
+      ? selectedOrganization
+      : compact && projectOrganizationIsSelectable && !sheetOrganization.isError
+        ? (sheetOrganization.data ?? null)
+        : null;
   const currentProjectId = project.data?.id ?? null;
   const projectContextIsReady =
     compact ||
@@ -133,15 +150,15 @@ export function ProjectWorkspace({
   const eligibleAssignees = useMemo<UserSummary[] | null>(() => {
     if (
       !projectOrganizationId ||
-      selectedOrganization?.id !== projectOrganizationId ||
-      !selectedOrganization.owner
+      permissionOrganization?.id !== projectOrganizationId ||
+      !permissionOrganization.owner
     ) {
       return null;
     }
 
     const users = new Map<string, UserSummary>();
-    users.set(selectedOrganization.owner.id, selectedOrganization.owner);
-    for (const organizationMember of selectedOrganization.members ?? []) {
+    users.set(permissionOrganization.owner.id, permissionOrganization.owner);
+    for (const organizationMember of permissionOrganization.members ?? []) {
       if (organizationMember.user) {
         users.set(organizationMember.user.id, organizationMember.user);
       }
@@ -153,11 +170,11 @@ export function ProjectWorkspace({
     return [...users.values()].sort((left, right) =>
       left.name.localeCompare(right.name),
     );
-  }, [projectMembers, projectOrganizationId, selectedOrganization]);
+  }, [projectMembers, projectOrganizationId, permissionOrganization]);
   const currentUserId = session?.user.id ?? null;
   const isOrganizationOwner =
-    selectedOrganization?.id === projectOrganizationId &&
-    selectedOrganization.members?.some(
+    permissionOrganization?.id === projectOrganizationId &&
+    permissionOrganization.members?.some(
       (member) => member.userId === currentUserId && member.role === "OWNER",
     );
   const canAdministerProject =

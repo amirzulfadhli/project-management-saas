@@ -1,6 +1,8 @@
 "use client";
 
 import { taskDraftKey, useTaskField } from "@/components/tasks/task-drafts";
+import Link from "next/link";
+import { taskHref } from "@/lib/task-links";
 import { useState } from "react";
 import {
   useInfiniteQuery,
@@ -91,7 +93,9 @@ export function TaskTimePanel({
   const pages = time.data?.pages ?? [];
   const entries = pages.flatMap((page) => page.items);
   const totalSeconds = pages[0]?.totalSeconds ?? 0;
-  const activeTimer = active.data?.activeTimer ?? null;
+  const activeTimer = active.isError
+    ? null
+    : (active.data?.activeTimer ?? null);
   const activeHere = activeTimer?.taskId === taskId;
   const activeElsewhere = Boolean(activeTimer && !activeHere);
 
@@ -151,7 +155,14 @@ export function TaskTimePanel({
           </p>
         ) : activeElsewhere && activeTimer ? (
           <p className="mt-3 text-sm text-text-secondary">
-            A timer is already running on {activeTimer.task.title}.
+            A timer is already running on{" "}
+            <Link
+              href={taskHref(activeTimer.projectId, activeTimer.taskId)}
+              className="text-primary hover:underline"
+            >
+              {activeTimer.task.title}
+            </Link>
+            . Stop it before starting another timer.
           </p>
         ) : null}
       </section>

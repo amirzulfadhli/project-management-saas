@@ -7,7 +7,8 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { taskHref } from "@/lib/task-links";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { queryKeys } from "@/lib/queries";
 import type { NotificationItem } from "@/lib/types";
@@ -59,6 +60,13 @@ function timestamp(value: string): string {
 }
 
 export function NotificationBell() {
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: session } = authClient.useSession();
@@ -103,7 +111,13 @@ export function NotificationBell() {
     onError: (error) => setMutationError(messageFor(error)),
   });
 
-  const items = notifications.data?.pages.flatMap((page) => page.items) ?? [];
+  const items = [
+    ...new Map(
+      (notifications.data?.pages.flatMap((page) => page.items) ?? []).map(
+        (item) => [item.id, item],
+      ),
+    ).values(),
+  ];
   const count = unread.data?.count ?? 0;
 
   async function openNotification(notification: NotificationItem) {
@@ -116,8 +130,19 @@ export function NotificationBell() {
         return;
       }
     }
+    if (!mounted.current) return;
     setOpen(false);
-    router.push(`/projects/${notification.projectId}`);
+    const taskId =
+      notification.entityType === "task"
+        ? notification.entityId
+        : notification.entityType === "comment"
+          ? metadataText(notification, "taskId")
+          : null;
+    router.push(
+      taskId
+        ? taskHref(notification.projectId, taskId)
+        : `/projects/${notification.projectId}`,
+    );
   }
 
   return (
@@ -215,7 +240,11 @@ export function NotificationBell() {
             >
               <Spinner /> Loading notifications…
             </div>
-          ) : notifications.isError ? (
+          ) : notifications.isError &&
+            (!notifications.isFetchNextPageError ||
+              items.length === 0 ||
+              (notifications.error instanceof ApiError &&
+                [401, 403].includes(notifications.error.status))) ? (
             <div className="space-y-3 p-5 text-center">
               <p className="text-sm text-danger">
                 {messageFor(notifications.error)}
@@ -238,31 +267,49 @@ export function NotificationBell() {
           ) : (
             <div className="divide-y divide-border">
               {items.map((notification) => (
-                <button
+                <div
                   key={notification.id}
-                  type="button"
-                  disabled={markRead.isPending || markAllRead.isPending}
-                  onClick={() => void openNotification(notification)}
-                  className={`block w-full px-3 py-3 text-left transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:cursor-wait ${notification.readAt ? "bg-surface" : "bg-selected"}`}
+                  className={notification.readAt ? "bg-surface" : "bg-selected"}
                 >
-                  <span className="block text-sm leading-5 break-words">
-                    {notificationMessage(notification)}
-                  </span>
-                  <span className="mt-1 flex items-center justify-between gap-3 text-xs text-text-secondary">
-                    <span className="min-w-0 truncate">
-                      {notification.project.name}
+                  <button
+                    type="button"
+                    disabled={markRead.isPending || markAllRead.isPending}
+                    onClick={() => void openNotification(notification)}
+                    className={`block w-full px-3 py-3 text-left transition-colors hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:cursor-wait ${notification.readAt ? "bg-surface" : "bg-selected"}`}
+                  >
+                    <span className="block text-sm leading-5 break-words">
+                      {notificationMessage(notification)}
                     </span>
-                    <time
-                      className="shrink-0"
-                      dateTime={notification.createdAt}
+                    <span className="mt-1 flex items-center justify-between gap-3 text-xs text-text-secondary">
+                      <span className="min-w-0 truncate">
+                        {notification.project.name}
+                      </span>
+                      <time
+                        className="shrink-0"
+                        dateTime={notification.createdAt}
+                      >
+                        {timestamp(notification.createdAt)}
+                      </time>
+                    </span>
+                    <span className="mt-1 block text-xs text-text-secondary">
+                      {notification.readAt ? "Read" : "Unread"}
+                    </span>
+                  </button>
+                  {!notification.readAt && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={markRead.isPending || markAllRead.isPending}
+                      aria-label={`Mark read: ${notificationMessage(notification)}`}
+                      onClick={() => {
+                        setMutationError(null);
+                        markRead.mutate(notification.id);
+                      }}
                     >
-                      {timestamp(notification.createdAt)}
-                    </time>
-                  </span>
-                  <span className="mt-1 block text-xs text-text-secondary">
-                    {notification.readAt ? "Read" : "Unread"}
-                  </span>
-                </button>
+                      Mark read
+                    </Button>
+                  )}
+                </div>
               ))}
             </div>
           )}

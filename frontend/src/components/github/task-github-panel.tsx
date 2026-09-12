@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
@@ -58,7 +59,8 @@ export function TaskGithubPanel({
       (!compact || choosing) &&
       linked.isSuccess &&
       !linked.data &&
-      Boolean(repository.data),
+      Boolean(repository.data?.installationId) &&
+      !repository.isError,
   });
 
   const refreshProjectGithub = async () => {
@@ -156,10 +158,23 @@ export function TaskGithubPanel({
     return (
       <EmptyState
         title="No GitHub repository connected"
-        description="Connect a verified repository from the Project GitHub panel before linking an Issue."
+        description="A Project owner can connect a verified repository from the Project GitHub section before linking an Issue."
       />
     );
   }
+  if (!repository.data.installationId)
+    return (
+      <p className="text-sm text-text-secondary">
+        This legacy connection cannot discover Issues.{" "}
+        <Link
+          className="text-primary hover:underline"
+          href={`/projects/${projectId}/github`}
+        >
+          Open Project GitHub
+        </Link>{" "}
+        for owner-managed setup.
+      </p>
+    );
   if (compact && !choosing)
     return (
       <Button variant="secondary" size="sm" onClick={() => setChoosing(true)}>
@@ -179,6 +194,13 @@ export function TaskGithubPanel({
   const available = (issues.data?.items ?? []).filter(
     (issue) => !issue.linkedTask,
   );
+  if (issues.data?.repository.id !== repository.data.id)
+    return (
+      <ErrorState
+        message="The repository connection changed. Reload Issues before linking."
+        onRetry={() => issues.refetch()}
+      />
+    );
   return (
     <section className="space-y-4" aria-label="Link a GitHub Issue">
       <div>
@@ -186,8 +208,9 @@ export function TaskGithubPanel({
           Link an open GitHub Issue
         </h3>
         <p className="mt-1 text-xs leading-5 text-text-secondary">
-          Future GitHub title, body, and state changes will synchronize here.
-          FlowPlan never moves the Task automatically.
+          Linking does not rewrite this Task now. Later supported GitHub events
+          may replace its title and description. GitHub state never moves the
+          Task between Columns; FlowPlan edits are not pushed to GitHub.
         </p>
       </div>
       {available.length === 0 ? (
@@ -222,7 +245,10 @@ export function TaskGithubPanel({
           variant="secondary"
           size="sm"
           disabled={page === 1 || link.isPending}
-          onClick={() => setPage((value) => value - 1)}
+          onClick={() => {
+            setSelectedNumber("");
+            setPage((value) => value - 1);
+          }}
         >
           Previous
         </Button>
@@ -231,13 +257,19 @@ export function TaskGithubPanel({
           variant="secondary"
           size="sm"
           disabled={!issues.data?.nextPage || link.isPending}
-          onClick={() => setPage((value) => value + 1)}
+          onClick={() => {
+            setSelectedNumber("");
+            setPage((value) => value + 1);
+          }}
         >
           Next
         </Button>
       </div>
       <Button
-        disabled={!selectedNumber || link.isPending}
+        disabled={
+          !available.some((issue) => issue.number === Number(selectedNumber)) ||
+          link.isPending
+        }
         onClick={() => link.mutate(Number(selectedNumber))}
       >
         {link.isPending ? "Linking..." : "Link Issue"}

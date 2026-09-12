@@ -27,6 +27,7 @@ import type { ProjectMember, Task } from "@/lib/types";
 let mockPathname = "/projects/project-a";
 let mockSearch = "";
 let mockOrganization: typeof organization | null = organization;
+let mockOtherOrganizations: (typeof organization)[] = [];
 let mockProject = projectFixture;
 let mockMembers: ProjectMember[] = projectFixture.projectMembers;
 const mockRouter = { push: jest.fn(), replace: jest.fn() };
@@ -43,7 +44,10 @@ jest.mock("@/lib/auth-client", () => ({
 }));
 jest.mock("@/components/organizations/organization-provider", () => ({
   useOrganization: () => ({
-    organizations: mockOrganization ? [mockOrganization] : [],
+    organizations: [
+      ...(mockOrganization ? [mockOrganization] : []),
+      ...mockOtherOrganizations,
+    ],
     selectedOrganization: mockOrganization,
     selectedOrganizationId: mockOrganization?.id ?? null,
     selectOrganization: mockSelect,
@@ -125,6 +129,7 @@ function setup(children: ReactNode = <Probe />) {
   return { client, tree, ...render(tree(children)) };
 }
 beforeEach(() => {
+  mockOtherOrganizations = [];
   mockPathname = "/projects/project-a";
   mockSearch = "";
   mockOrganization = organization;
@@ -138,6 +143,40 @@ beforeEach(() => {
   jest.spyOn(api, "getTasks").mockResolvedValue([]);
 });
 afterEach(() => jest.restoreAllMocks());
+
+test("cross-Organization Task sheet uses target authority without switching the background", async () => {
+  mockOrganization = { ...organization, id: "background-org", members: [] };
+  mockOtherOrganizations = [organization];
+  mockMembers = [];
+  const getOrganization = jest
+    .spyOn(api, "getOrganization")
+    .mockResolvedValue(
+      organization as Awaited<ReturnType<typeof api.getOrganization>>,
+    );
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const tree = (
+    <QueryClientProvider client={client}>
+      <ProjectWorkspace id="project-a" compact>
+        <Probe />
+      </ProjectWorkspace>
+    </QueryClientProvider>
+  );
+  const view = render(tree);
+  await screen.findByText("project-a: administrator");
+  expect(getOrganization).toHaveBeenCalledWith("org-a");
+  expect(mockSelect).not.toHaveBeenCalled();
+  mockOtherOrganizations = [];
+  view.rerender(
+    <QueryClientProvider client={client}>
+      <ProjectWorkspace id="project-a" compact>
+        <Probe />
+      </ProjectWorkspace>
+    </QueryClientProvider>,
+  );
+  await screen.findByText("project-a: collaborator");
+});
 
 test("persistent section navigation uses real URLs and does not load Board Tasks on resource pages", async () => {
   mockPathname = "/projects/project-a/docs";

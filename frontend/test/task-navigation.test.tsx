@@ -37,11 +37,10 @@ function setup(content: ReactNode) {
 afterEach(() => jest.restoreAllMocks());
 test("compact Task GitHub context waits for explicit discovery", async () => {
   jest.spyOn(api, "getTaskGithubIssue").mockResolvedValue(null);
-  jest
-    .spyOn(api, "getProjectRepository")
-    .mockResolvedValue({ id: "repo-a" } as Awaited<
-      ReturnType<typeof api.getProjectRepository>
-    >);
+  jest.spyOn(api, "getProjectRepository").mockResolvedValue({
+    id: "repo-a",
+    installationId: "installation-a",
+  } as Awaited<ReturnType<typeof api.getProjectRepository>>);
   jest.spyOn(api, "getProjectGithubIssues").mockResolvedValue({
     items: [],
     page: 1,

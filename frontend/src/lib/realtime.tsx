@@ -14,6 +14,7 @@ import { io, type Socket } from "socket.io-client";
 import { API_URL } from "./api";
 import { authClient } from "./auth-client";
 import { queryKeys } from "./queries";
+import { invalidateGithubResources } from "./github-cache";
 import type { Task } from "./types";
 
 export const realtimeEventTypes = {
@@ -333,6 +334,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
           break;
         case "repository":
           void Promise.all([
+            invalidateGithubResources(
+              queryClient,
+              event.projectId,
+              sessionUserId,
+            ),
             queryClient.invalidateQueries({
               queryKey: queryKeys.projectRepository(event.projectId),
               exact: true,
