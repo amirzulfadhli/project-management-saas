@@ -26,6 +26,7 @@ import { ApiError, api } from "@/lib/api";
 import { queryKeys } from "@/lib/queries";
 import type { Column, MoveTaskInput, Task } from "@/lib/types";
 import { TaskCard } from "@/components/tasks/task-card";
+import { Icon } from "@/components/ui/icon";
 
 interface ProjectKanbanProps {
   projectId: string;
@@ -319,7 +320,7 @@ function KanbanColumn({
               aria-label={`Manage ${column.name} Column`}
               onClick={() => onManageColumn(column.id)}
             >
-              …
+              <Icon name="more" className="size-4 shrink-0" />
             </button>
           )}
         </div>
@@ -398,9 +399,7 @@ function SortableTaskCard({
             title="Drag to move. Keyboard: Space to pick up, arrows to move, Space or Enter to drop, Escape to cancel."
             className="flex min-h-[40px] min-w-[40px] cursor-grab touch-none items-center justify-center rounded p-2 text-text-secondary opacity-70 transition-opacity hover:bg-hover hover:text-text-primary focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary active:cursor-grabbing group-hover:opacity-100 disabled:cursor-wait"
           >
-            <span aria-hidden="true" className="block text-xs leading-none">
-              ::
-            </span>
+            <Icon name="grip" className="size-4 shrink-0" />
           </button>
         }
       />

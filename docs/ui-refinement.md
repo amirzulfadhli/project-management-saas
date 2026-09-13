@@ -1,9 +1,10 @@
-# UI refinement — Phases A–D
+# UI refinement
 
 Phase A implements the approved shell, navigation, spacing and interaction
 foundation. Phase B adds the persistent Project workspace described below.
 Phase C adds reading-first Task detail and Board interaction refinement.
-Phase D refines resource and collaboration workflows. Phase E has not started.
+Phase D refines resource and collaboration workflows. Phase E acceptance remains
+open. Phase F adds only the restrained visual corrections recorded below.
 
 ## Implemented
 
@@ -372,3 +373,43 @@ remain intact. Focused regression is 25/25; full frontend regression is 121/121 
 13 suites. Static checks and production build pass. No backend/schema changes or
 Phase F visual polish. Same-account multi-tab checks do not establish independent
 two-user authorization acceptance. Functional freeze remains reopened.
+
+## Phase F — Restrained visual consistency
+
+Inspection of the current local UI identified three small inconsistencies:
+
+- At 390px, Project administration links squeezed the title and description into
+  a narrow column. Below the existing `sm` breakpoint these links now sit below
+  full-width Project identity; desktop keeps the existing side-by-side layout.
+- Shared dialog close, Column menu and Task drag-handle controls used font glyphs
+  with inconsistent sizing. They now use the existing decorative SVG Icon
+  component. Accessible names, targets, focus behavior and drag listeners are
+  unchanged.
+- Docs code blended into its surrounding page. Existing surface/border tokens
+  now distinguish inline code and fenced blocks. Markdown security, parsing,
+  wrapping and overflow rules are unchanged.
+
+No routing, information architecture, authorization, queries, realtime, backend,
+API, database, resource workflows, dependencies or global design tokens changed.
+The computer-use skill was used only for before/after visual inspection, without
+editing application data or repeating Phase E workflow acceptance.
+
+### Phase F verification
+
+- Focused component regression: **34/34 tests in 3 suites**.
+- Full frontend regression: **122/122 tests in 13 suites**; shared SVG controls
+  retain their accessible button labels and existing interactions.
+- TypeScript, ESLint, changed-file Prettier, production build using the local
+  API URL, and `git diff --check`: pass. Backend/PostgreSQL suites were not rerun
+  because no backend or domain contract changed.
+- Current production frontend visual smoke at **1280×900** and **390×844**:
+  Project identity/actions, Docs reading with long inline code, populated Board
+  controls and empty Notification panel pass. The narrow Project title is no
+  longer squeezed, the panel stays within the viewport, and Board overflow stays
+  inside its horizontal scroller rather than expanding the document. Fenced-code
+  styling was reviewed in source, not exercised by the retained visual fixture.
+
+These are targeted visual checks, not another broad acceptance audit or physical
+device/assistive-technology certification. The temporary viewport override was
+reset. **Phase E remains OPEN**, with its existing acceptance record unchanged.
+Functional freeze is not restored. No next phase or new feature is started.

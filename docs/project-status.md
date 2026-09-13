@@ -137,7 +137,23 @@ drafts, timer persistence, Docs/file upload, same-account remote deletion and
 post-restart Docs reconciliation have partial acceptance evidence. Distinct-user
 privacy/revocation/read persistence, physical touch, confirmed file downloads and
 the remaining checklist are not claimed passed. **PHASE E ACCEPTANCE: INCOMPLETE.**
-**FUNCTIONAL FREEZE REMAINS REOPENED. Phase F has not started.**
+**FUNCTIONAL FREEZE REMAINS REOPENED.**
+
+### UI refinement Phase F
+
+Restrained visual consistency is implemented: narrow Project headers now place
+administration links below full-width identity; shared close, Column-menu and
+drag-handle glyphs use the existing SVG icon style; Docs code uses existing
+surface/border tokens. No routing, information architecture, backend/domain,
+authorization, realtime, query or Board movement behavior changed.
+
+Frontend regression passes **122/122 in 13 suites** (focused: **34/34 in 3**),
+with passing TypeScript, ESLint, changed-file Prettier, production build and
+`git diff --check`. Current-build visual smoke passes at desktop 1280px and
+390px for the Project header, Docs inline code, populated Board controls and
+empty Notification panel. See [UI refinement](ui-refinement.md) for boundaries.
+No application data was edited and no Phase E workflow acceptance was repeated.
+**PHASE E REMAINS OPEN. FUNCTIONAL FREEZE IS NOT RESTORED.**
 
 ### Previous defect-closure verification
 

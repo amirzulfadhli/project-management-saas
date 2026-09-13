@@ -33,6 +33,17 @@ test("closed dialogs do not mount feature content", () => {
   expect(screen.queryByLabelText("Draft")).toBeNull();
 });
 
+test("shared close icon remains decorative inside the labelled control", () => {
+  render(<Harness />);
+  fireEvent.click(screen.getByRole("button", { name: "Open editor" }));
+  const close = screen.getByRole("button", { name: "Close Editor" });
+  const icon = close.querySelector("svg");
+  expect(icon?.getAttribute("aria-hidden")).toBe("true");
+  expect(icon?.getAttribute("viewBox")).toBe("0 0 24 24");
+  fireEvent.click(close);
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
 test("opens in the native modal layer, focuses close and restores trigger and scroll", () => {
   document.body.style.overflow = "auto";
   render(<Harness />);

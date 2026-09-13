@@ -535,7 +535,7 @@ function WikiEditor({
 
 function Markdown({ content }: { content: string }) {
   return (
-    <div className="space-y-3 break-words text-sm leading-7 text-text-primary [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_code]:rounded [&_code]:bg-background [&_code]:px-1 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-background [&_pre]:p-3 [&_table]:block [&_table]:overflow-x-auto [&_ul]:list-disc">
+    <div className="space-y-3 break-words text-sm leading-7 text-text-primary [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_code]:rounded [&_code]:bg-hover [&_code]:px-1 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:border [&_pre]:border-border [&_pre]:bg-hover [&_pre]:p-3 [&_table]:block [&_table]:overflow-x-auto [&_ul]:list-disc">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         skipHtml

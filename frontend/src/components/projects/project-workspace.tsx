@@ -232,8 +232,8 @@ export function ProjectWorkspace({
         children
       ) : (
         <div className="min-w-0 space-y-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
+          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
+            <div className="min-w-0 w-full sm:flex-1">
               <p className="mb-1 truncate text-sm text-text-secondary">
                 {data.organization.name}
               </p>
@@ -264,7 +264,7 @@ export function ProjectWorkspace({
             </div>
             <nav
               aria-label="Project administration"
-              className="flex flex-wrap gap-2"
+              className="flex shrink-0 flex-wrap gap-2"
             >
               <Link
                 aria-current={

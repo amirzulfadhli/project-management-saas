@@ -148,6 +148,14 @@ test("card opening is separate from drag handle, with contextual owner controls 
   fireEvent.click(screen.getAllByRole("button", { name: "+ Add Task" })[1]);
   expect(onCreate).toHaveBeenCalledWith("column-b");
   expect(screen.getByRole("region", { name: "Task Board" })).toBeTruthy();
+  for (const name of ["Move Alpha", "Manage Doing Column"]) {
+    expect(
+      screen
+        .getByRole("button", { name })
+        .querySelector("svg")
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
+  }
 });
 test("collaborators can move Tasks but cannot administer structure", () => {
   setup(false);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import { Icon } from "./icon";
 
 let scrollLocks = 0;
 let originalOverflow = "";
@@ -97,9 +98,9 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label={`Close ${title}`}
-            className="icon-control text-xl text-text-secondary hover:bg-hover hover:text-text-primary"
+            className="icon-control text-text-secondary hover:bg-hover hover:text-text-primary"
           >
-            <span aria-hidden="true">×</span>
+            <Icon name="close" className="size-4 shrink-0" />
           </button>
         </div>
         <div className="min-h-0 overflow-y-auto overscroll-contain p-4">

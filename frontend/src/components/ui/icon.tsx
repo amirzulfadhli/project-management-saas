@@ -8,6 +8,9 @@ const paths = {
     "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
   organizations: "M4 21V3h12v18M2 21h20M16 9h4v12M8 7h4M8 11h4M8 15h4",
   menu: "M4 6h16M4 12h16M4 18h16",
+  close: "m6 6 12 12M6 18 18 6",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
+  grip: "M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01",
 } as const;
 
 export function Icon({
