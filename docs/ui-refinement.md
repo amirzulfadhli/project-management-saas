@@ -358,3 +358,17 @@ sync. Two clients must exercise membership changes, access loss and reconnect.
 Recheck Phase C sheet history, native focus and Board pointer/keyboard/touch drag.
 Component tests do not substitute for these browser checks. Live GitHub remains
 blocked on public HTTPS/live App credentials. Functional freeze is not restored.
+
+## Phase E — Cross-surface correctness and acceptance
+
+In progress; see the [Phase E acceptance record](phase-e-acceptance.md) for
+per-surface evidence and outstanding manual/environment gates.
+
+Two demonstrated frontend defects are fixed: Project-context synchronization no
+longer undoes an explicit Organization switch during outgoing navigation, and
+Board drag live announcements identify Task/Column names instead of internal IDs.
+Direct-link adoption, access boundaries, Task routing/drafts, movement and ordering
+remain intact. Focused regression is 25/25; full frontend regression is 121/121 in
+13 suites. Static checks and production build pass. No backend/schema changes or
+Phase F visual polish. Same-account multi-tab checks do not establish independent
+two-user authorization acceptance. Functional freeze remains reopened.

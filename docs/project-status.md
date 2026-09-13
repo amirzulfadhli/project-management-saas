@@ -1,6 +1,6 @@
 # FlowPlan repository status
 
-Last verified: 2026-09-12
+Last verified: 2026-09-13
 
 ## Release checkpoint
 
@@ -115,8 +115,29 @@ The full frontend suite passes **118/118 in 13 suites**; after a final Docs
 save-in-flight guard, affected resource suites pass **25/25 in 2 suites**.
 TypeScript, ESLint, changed-file Prettier, production build and
 `git diff --check` pass. Historical backend/PostgreSQL results were not rerun.
-**PHASE D MANUAL UI ACCEPTANCE: PENDING. Phase E has not begun.**
+**PHASE D MANUAL UI ACCEPTANCE: PENDING; Phase E acceptance is in progress.**
 V1 functional freeze remains reopened; no live GitHub/browser acceptance is claimed.
+
+### UI refinement Phase E
+
+Real browser acceptance found and fixed an Organization-switch synchronization
+race and UUID-based Board drag announcements. Direct Project context still adopts
+the correct Organization, while outgoing explicit switches are no longer undone.
+Board movement/order and all backend contracts remain unchanged.
+
+The current-code stack was verified before accepting Time/GitHub behavior: the
+stale Docker backend was rebuilt and four already-existing pending migrations
+were applied normally (17 applied), without resetting the database or volumes.
+Frontend tests pass **121/121 in 13 suites**, with passing TypeScript, ESLint,
+changed-file Prettier, production build and `git diff --check`.
+
+See [Phase E acceptance record](phase-e-acceptance.md) for exact browser evidence,
+the retained QA fixture and unresolved checks. Real 390px/desktop, Task history/
+drafts, timer persistence, Docs/file upload, same-account remote deletion and
+post-restart Docs reconciliation have partial acceptance evidence. Distinct-user
+privacy/revocation/read persistence, physical touch, confirmed file downloads and
+the remaining checklist are not claimed passed. **PHASE E ACCEPTANCE: INCOMPLETE.**
+**FUNCTIONAL FREEZE REMAINS REOPENED. Phase F has not started.**
 
 ### Previous defect-closure verification
 

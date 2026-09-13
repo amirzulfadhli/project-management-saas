@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import {
+  type Announcements,
   closestCorners,
   DndContext,
   DragEndEvent,
@@ -70,6 +71,36 @@ export function ProjectKanban({
   const activeTask = activeTaskId
     ? tasks.find((task) => task.id === activeTaskId)
     : undefined;
+  const announcements = useMemo<Announcements>(() => {
+    const taskName = (id: string | number) =>
+      tasks.find((task) => task.id === String(id))?.title ?? "Task";
+    const destination = (
+      over: Parameters<Announcements["onDragOver"]>[0]["over"],
+    ) => {
+      const columnId = over?.data.current?.columnId;
+      const column = columns.find((item) => item.id === columnId);
+      if (!column) return null;
+      const target = tasks.find((task) => task.id === String(over?.id));
+      return target ? `${column.name}, at ${target.title}` : column.name;
+    };
+    return {
+      onDragStart: ({ active }) => `Picked up ${taskName(active.id)}.`,
+      onDragOver: ({ active, over }) => {
+        const target = destination(over);
+        return target
+          ? `${taskName(active.id)} over ${target}.`
+          : `${taskName(active.id)} is outside a valid drop area.`;
+      },
+      onDragEnd: ({ active, over }) => {
+        const target = destination(over);
+        return target
+          ? `Dropped ${taskName(active.id)} in ${target}.`
+          : `No move made for ${taskName(active.id)}.`;
+      },
+      onDragCancel: ({ active }) =>
+        `Movement cancelled for ${taskName(active.id)}.`,
+    };
+  }, [columns, tasks]);
 
   const moveTask = useMutation({
     mutationFn: ({ taskId, columnId, targetIndex }: MoveVariables) =>
@@ -207,6 +238,7 @@ export function ProjectKanban({
             : ""}
       </p>
       <DndContext
+        accessibility={{ announcements }}
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}

@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
-import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import type {
+  Announcements,
+  DragEndEvent,
+  DragStartEvent,
+} from "@dnd-kit/core";
 import {
   act,
   fireEvent,
@@ -19,6 +23,7 @@ import type { Task } from "@/lib/types";
 import { column, taskFixture } from "./project-fixtures";
 
 let mockDnd: {
+  accessibility: { announcements: Announcements };
   onDragEnd: (e: DragEndEvent) => void;
   onDragStart: (e: DragStartEvent) => void;
   onDragCancel: () => void;
@@ -213,4 +218,25 @@ test("cancel and invalid destination never mutate ordering", async () => {
   await act(async () => mockDnd.onDragCancel());
   await act(async () => mockDnd.onDragEnd(drop("other-project-column")));
   expect(api.moveTask).not.toHaveBeenCalled();
+});
+
+test("drag announcements identify Tasks and Columns, never internal IDs", () => {
+  setup();
+  const announcements = mockDnd.accessibility.announcements;
+  const event = drop("column-b");
+  expect(announcements.onDragStart(event)).toBe("Picked up Alpha.");
+  expect(announcements.onDragOver(event)).toBe("Alpha over Doing.");
+  expect(announcements.onDragEnd(event)).toBe("Dropped Alpha in Doing.");
+  expect(announcements.onDragCancel(event)).toBe(
+    "Movement cancelled for Alpha.",
+  );
+  expect(announcements.onDragOver(drop(column.id, true, "task-b"))).toBe(
+    `Alpha over ${column.name}, at Beta.`,
+  );
+  expect(announcements.onDragEnd({ ...event, over: null })).toBe(
+    "No move made for Alpha.",
+  );
+  expect(announcements.onDragOver(drop("unknown-column"))).toBe(
+    "Alpha is outside a valid drop area.",
+  );
 });

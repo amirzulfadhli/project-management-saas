@@ -117,16 +117,24 @@ export function ProjectWorkspace({
     enabled: Boolean(currentProjectId) && projectContextIsReady,
   });
 
+  const adoptedOrganizationRef = useRef<string | null>(null);
   useEffect(() => {
+    const contextKey = `${id}:${projectOrganizationId}`;
     if (
       !compact &&
       projectOrganizationId &&
       projectOrganizationIsSelectable &&
-      projectOrganizationId !== selectedOrganizationId
+      adoptedOrganizationRef.current !== contextKey
     ) {
-      selectOrganization(projectOrganizationId);
+      // Adopt direct-link context once. Do not undo an explicit switch while
+      // the old workspace is still mounted during the outgoing navigation.
+      adoptedOrganizationRef.current = contextKey;
+      if (projectOrganizationId !== selectedOrganizationId) {
+        selectOrganization(projectOrganizationId);
+      }
     }
   }, [
+    id,
     compact,
     projectOrganizationId,
     projectOrganizationIsSelectable,

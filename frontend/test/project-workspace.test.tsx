@@ -219,6 +219,26 @@ test("one subscription survives section navigation and is released on workspace 
   view.unmount();
   expect(mockUnsubscribe).toHaveBeenCalledWith("project-a");
 });
+
+test("leaving a Project for another Organization does not reselect the old Organization", async () => {
+  const view = setup();
+  await screen.findByText("project-a: administrator");
+  mockOtherOrganizations = [organization];
+  mockOrganization = { ...organization, id: "other-org" };
+  // The previous route stays mounted while Next finishes the navigation.
+  view.rerender(view.tree(<Probe />));
+  expect(mockSelect).not.toHaveBeenCalled();
+  expect(mockUnsubscribe).toHaveBeenCalledWith("project-a");
+});
+
+test("a direct Project entry adopts its accessible Organization once", async () => {
+  mockOrganization = { ...organization, id: "other-org" };
+  mockOtherOrganizations = [organization];
+  const view = setup();
+  await waitFor(() => expect(mockSelect).toHaveBeenCalledWith("org-a"));
+  view.rerender(view.tree(<Probe />));
+  expect(mockSelect).toHaveBeenCalledTimes(1);
+});
 test.each([
   "member",
   "explicit-owner",
