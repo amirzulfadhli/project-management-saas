@@ -49,44 +49,44 @@ function ProjectsContent() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Projects</h1>
-          <p className="text-sm text-text-secondary">
+        <div className="min-w-0">
+          <h1 className="page-title">Projects</h1>
+          <p className="page-description break-words">
             {selectedOrganization
               ? `Projects in ${selectedOrganization.name}.`
               : "Select an organization to view its projects."}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <nav
-            aria-label="Project archive view"
-            className="flex border-b border-border"
+        {!showArchived ? (
+          <Button
+            className="shrink-0"
+            onClick={() => setCreateOpen(true)}
+            disabled={!selectedOrganizationId}
           >
-            {[false, true].map((archived) => (
-              <Link
-                key={String(archived)}
-                href={archived ? "/projects?view=archived" : "/projects"}
-                aria-current={showArchived === archived ? "page" : undefined}
-                className={`control-target inline-flex items-center border-b-2 px-4 text-sm font-medium ${showArchived === archived ? "border-primary text-primary" : "border-transparent text-text-secondary hover:bg-hover"}`}
-              >
-                {archived ? "Archived" : "Active"}
-              </Link>
-            ))}
-          </nav>
-          {!showArchived ? (
-            <Button
-              onClick={() => setCreateOpen(true)}
-              disabled={!selectedOrganizationId}
-            >
-              New Project
-            </Button>
-          ) : null}
-        </div>
+            New Project
+          </Button>
+        ) : null}
       </div>
+
+      <nav
+        aria-label="Project archive view"
+        className="flex gap-4 border-b border-border"
+      >
+        {[false, true].map((archived) => (
+          <Link
+            key={String(archived)}
+            href={archived ? "/projects?view=archived" : "/projects"}
+            aria-current={showArchived === archived ? "page" : undefined}
+            className={`control-target inline-flex items-center border-b-2 px-1 pb-3 text-sm font-medium ${showArchived === archived ? "border-primary text-primary" : "border-transparent text-text-secondary hover:text-text-primary"}`}
+          >
+            {archived ? "Archived" : "Active"}
+          </Link>
+        ))}
+      </nav>
 
       {notice && notice.organizationId === selectedOrganizationId ? (
         <div
-          className="rounded-md border border-success/30 bg-success/5 px-4 py-3 text-sm text-success"
+          className="rounded-md border border-success/30 bg-success/5 px-4 py-3 text-sm break-words text-success"
           role="status"
         >
           {notice.message}
@@ -112,7 +112,7 @@ function ProjectsContent() {
           onRetry={() => projects.refetch()}
         />
       ) : projects.data && projects.data.length > 0 ? (
-        <div className="divide-y divide-border rounded-lg border border-border bg-surface">
+        <div className="content-panel divide-y divide-border">
           {projects.data.map((project) => (
             <ProjectCard
               key={project.id}

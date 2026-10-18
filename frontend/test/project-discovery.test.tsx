@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ProjectsPage from "@/app/projects/page";
 import { OrganizationProvider } from "@/components/organizations/organization-provider";
 import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/queries";
 import {
   organization,
   projectFixture,
@@ -27,18 +28,16 @@ jest.mock("next/navigation", () => ({
 jest.mock("@/lib/auth-client", () => ({
   authClient: { useSession: () => ({ data: { user: { id: "user-a" } } }) },
 }));
-jest.mock("@/components/projects/create-project-modal", () => ({
-  CreateProjectModal: () => null,
-}));
 function setup(content = <ProjectsPage />) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <OrganizationProvider>{content}</OrganizationProvider>
     </QueryClientProvider>,
   );
+  return { ...view, client };
 }
 beforeEach(() => {
   mockPath = "/projects";
@@ -53,6 +52,57 @@ beforeEach(() => {
   jest.spyOn(api, "getProjects").mockResolvedValue([projectSummary]);
 });
 afterEach(() => jest.restoreAllMocks());
+test("New Project opens the real modal, resets on Cancel and submits in the selected Organization", async () => {
+  const created = {
+    ...projectFixture,
+    id: "project-new",
+    name: "New workspace",
+  };
+  const create = jest.spyOn(api, "createProject").mockResolvedValue(created);
+  const { client } = setup();
+  await screen.findByRole("link", { name: /FlowPlan/ });
+  fireEvent.click(screen.getByRole("button", { name: "New Project" }));
+  let dialog = within(screen.getByRole("dialog", { name: "New Project" }));
+  expect(
+    (
+      dialog.getByRole("button", {
+        name: "Create Project",
+      }) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true);
+  expect(dialog.getByText("Studio")).toBeTruthy();
+  fireEvent.change(dialog.getByRole("textbox", { name: "Name" }), {
+    target: { value: "Discarded draft" },
+  });
+  fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(create).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "New Project" }));
+  dialog = within(screen.getByRole("dialog", { name: "New Project" }));
+  expect(
+    (dialog.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value,
+  ).toBe("");
+  fireEvent.change(dialog.getByRole("textbox", { name: "Name" }), {
+    target: { value: "  New workspace  " },
+  });
+  fireEvent.change(dialog.getByRole("textbox", { name: "Description" }), {
+    target: { value: "  Project notes  " },
+  });
+  fireEvent.click(dialog.getByRole("button", { name: "Create Project" }));
+  await waitFor(() =>
+    expect(create).toHaveBeenCalledWith({
+      name: "New workspace",
+      description: "Project notes",
+      organizationId: "org-a",
+    }),
+  );
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(client.getQueryData(queryKeys.project("project-new"))).toEqual(
+    created,
+  );
+  expect(mockRouter.replace).not.toHaveBeenCalled();
+});
 test.each([false, true])(
   "archive scope %s comes from URL and reaches the existing scoped API",
   async (archived) => {

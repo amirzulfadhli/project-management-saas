@@ -22,8 +22,8 @@ export default function Sidebar({
   const pathname = usePathname();
   const { selectedOrganization } = useOrganization();
   return (
-    <div className="flex h-full min-w-0 flex-col gap-6">
-      <div>
+    <div className="flex h-full min-w-0 flex-col gap-5">
+      <div className="border-b border-border pb-5">
         <Link
           href="/"
           onClick={onNavigate}
@@ -51,14 +51,14 @@ export default function Sidebar({
               aria-current={active ? "page" : undefined}
               className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium ${active ? "bg-selected text-primary" : "text-text-secondary hover:bg-hover hover:text-text-primary"}`}
             >
-              <Icon name={item.icon} />
+              <Icon name={item.icon} className="size-4 shrink-0" />
               {item.label}
             </Link>
           );
         })}
       </nav>
-      <div className="space-y-1">
-        <p className="px-3 text-xs font-medium text-text-secondary">
+      <div className="space-y-1 border-t border-border pt-5">
+        <p className="mb-2 px-3 text-xs font-medium text-text-secondary">
           Organization
         </p>
         <button
@@ -67,19 +67,19 @@ export default function Sidebar({
           onClick={onMembers}
           className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-text-secondary hover:bg-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Icon name="members" />
+          <Icon name="members" className="size-4 shrink-0" />
           Members
         </button>
+        <Link
+          href="/organizations"
+          onClick={onNavigate}
+          aria-current={pathname === "/organizations" ? "page" : undefined}
+          className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-sm ${pathname === "/organizations" ? "bg-selected text-primary" : "text-text-secondary hover:bg-hover hover:text-text-primary"}`}
+        >
+          <Icon name="organizations" className="size-4 shrink-0" />
+          Manage organizations
+        </Link>
       </div>
-      <Link
-        href="/organizations"
-        onClick={onNavigate}
-        aria-current={pathname === "/organizations" ? "page" : undefined}
-        className={`mt-auto flex min-h-11 items-center gap-3 rounded-md px-3 text-sm ${pathname === "/organizations" ? "bg-selected text-primary" : "text-text-secondary hover:bg-hover hover:text-text-primary"}`}
-      >
-        <Icon name="organizations" />
-        Manage organizations
-      </Link>
     </div>
   );
 }

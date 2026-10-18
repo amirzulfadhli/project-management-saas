@@ -16,12 +16,10 @@ export default function DashboardPage() {
     .sort((left, right) => (left.dueDate! < right.dueDate! ? -1 : 1));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-text-primary">Overview</h1>
-        <p className="mt-1 text-text-secondary">
-          Your current work at a glance.
-        </p>
+        <h1 className="page-title">Overview</h1>
+        <p className="page-description">Your current work at a glance.</p>
       </div>
 
       {organizationWork.isPending ? (
@@ -39,46 +37,58 @@ export default function DashboardPage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <SummaryCard
+          <dl className="content-panel grid grid-cols-3 divide-x divide-border">
+            <SummaryItem
               label="Projects"
               value={organizationWork.projects.length}
             />
-            <SummaryCard label="Tasks" value={organizationWork.tasks.length} />
-            <SummaryCard label="Scheduled" value={scheduledTasks.length} />
-          </div>
+            <SummaryItem label="Tasks" value={organizationWork.tasks.length} />
+            <SummaryItem label="Scheduled" value={scheduledTasks.length} />
+          </dl>
 
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-text-primary">
-                  Recent Projects
+          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+            <section
+              className="content-panel overflow-hidden"
+              aria-labelledby="scheduled-tasks-heading"
+            >
+              <div className="panel-heading">
+                <h2
+                  id="scheduled-tasks-heading"
+                  className="text-base font-semibold text-text-primary"
+                >
+                  Scheduled Tasks
                 </h2>
                 <Link
-                  href="/projects"
-                  className="text-sm text-primary hover:text-primary/80"
+                  href="/tasks"
+                  aria-label="View all Tasks"
+                  className="control-target inline-flex items-center text-sm text-primary hover:underline"
                 >
                   View all →
                 </Link>
               </div>
 
-              {organizationWork.projects.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-text-secondary">
-                  No projects yet.
+              {scheduledTasks.length === 0 ? (
+                <p className="px-5 py-10 text-center text-sm text-text-secondary">
+                  No tasks with deadlines.
                 </p>
               ) : (
-                <div className="space-y-2">
-                  {organizationWork.projects.slice(0, 5).map((project) => (
+                <div className="divide-y divide-border">
+                  {scheduledTasks.slice(0, 5).map((task) => (
                     <Link
-                      key={project.id}
-                      href={`/projects/${project.id}`}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3 hover:bg-hover"
+                      key={task.id}
+                      href={taskHref(task.projectId, task.id)}
+                      className="flex min-w-0 items-center justify-between gap-4 px-4 py-4 transition-colors hover:bg-hover focus-visible:-outline-offset-2 sm:px-5"
                     >
-                      <span className="truncate font-medium text-text-primary">
-                        {project.name}
-                      </span>
-                      <span className="shrink-0 text-xs text-text-secondary">
-                        {project._count.tasks} tasks
+                      <div className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-text-primary">
+                          {task.title}
+                        </span>
+                        <span className="mt-1 block truncate text-xs text-text-secondary">
+                          {task.project.name}
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-xs tabular-nums text-text-secondary">
+                        {formatDate(task.dueDate)}
                       </span>
                     </Link>
                   ))}
@@ -86,41 +96,43 @@ export default function DashboardPage() {
               )}
             </section>
 
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-text-primary">
-                  Scheduled Tasks
+            <section
+              className="content-panel overflow-hidden"
+              aria-labelledby="recent-projects-heading"
+            >
+              <div className="panel-heading">
+                <h2
+                  id="recent-projects-heading"
+                  className="text-base font-semibold text-text-primary"
+                >
+                  Recent Projects
                 </h2>
                 <Link
-                  href="/tasks"
-                  className="text-sm text-primary hover:text-primary/80"
+                  href="/projects"
+                  aria-label="View all Projects"
+                  className="control-target inline-flex items-center text-sm text-primary hover:underline"
                 >
                   View all →
                 </Link>
               </div>
 
-              {scheduledTasks.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-text-secondary">
-                  No tasks with deadlines.
+              {organizationWork.projects.length === 0 ? (
+                <p className="px-5 py-10 text-center text-sm text-text-secondary">
+                  No projects yet.
                 </p>
               ) : (
-                <div className="space-y-2">
-                  {scheduledTasks.slice(0, 5).map((task) => (
+                <div className="divide-y divide-border">
+                  {organizationWork.projects.slice(0, 5).map((project) => (
                     <Link
-                      key={task.id}
-                      href={taskHref(task.projectId, task.id)}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3 hover:bg-hover"
+                      key={project.id}
+                      href={`/projects/${project.id}`}
+                      className="flex min-w-0 items-center justify-between gap-4 px-4 py-4 transition-colors hover:bg-hover focus-visible:-outline-offset-2 sm:px-5"
                     >
-                      <div className="min-w-0">
-                        <span className="block truncate font-medium text-text-primary">
-                          {task.title}
-                        </span>
-                        <span className="text-xs text-text-secondary">
-                          {task.project.name}
-                        </span>
-                      </div>
-                      <span className="shrink-0 text-xs text-text-secondary">
-                        {formatDate(task.dueDate)}
+                      <span className="min-w-0 truncate text-sm font-medium text-text-primary">
+                        {project.name}
+                      </span>
+                      <span className="shrink-0 text-xs tabular-nums text-text-secondary">
+                        {project._count.tasks} tasks
                       </span>
                     </Link>
                   ))}
@@ -134,11 +146,13 @@ export default function DashboardPage() {
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
+function SummaryItem({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <p className="text-sm text-text-secondary">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-text-primary">{value}</p>
+    <div className="min-w-0 px-4 py-4 sm:px-5">
+      <dt className="text-xs text-text-secondary sm:text-sm">{label}</dt>
+      <dd className="mt-1 text-xl font-semibold tabular-nums text-text-primary">
+        {value}
+      </dd>
     </div>
   );
 }

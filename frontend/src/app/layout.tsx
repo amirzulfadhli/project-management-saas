@@ -13,7 +13,7 @@ export default function RootLayout({
   task,
 }: {
   children: React.ReactNode;
-  task?: React.ReactNode;
+  task: React.ReactNode;
 }) {
   return (
     <html lang="en" className="h-full antialiased">

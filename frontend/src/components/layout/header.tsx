@@ -96,7 +96,7 @@ export default function Header({
           )}
         </nav>
       </div>
-      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2 [&>button]:rounded-md [&>button]:px-2 [&>button]:text-sm [&>button]:hover:bg-hover">
         <NotificationBell />
         <AuthStatus />
       </div>

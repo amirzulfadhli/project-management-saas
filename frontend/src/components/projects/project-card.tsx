@@ -65,42 +65,49 @@ export function ProjectCard({
   };
 
   return (
-    <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 p-4">
+    <div
+      className={`grid min-w-0 items-start gap-x-4 gap-y-2 px-4 py-4 sm:px-5 ${canAdminister ? "grid-cols-[minmax(0,1fr)_5rem]" : "grid-cols-1"}`}
+    >
       <Link
         href={`/projects/${project.id}`}
-        className="min-w-0 flex-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="grid min-w-0 gap-3 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:grid-cols-[minmax(0,1fr)_11rem] md:items-center md:gap-5"
       >
-        <div className="mb-1 flex items-start justify-between gap-2">
-          <h3 className="min-w-0 break-words font-medium text-text-primary">
-            {project.name}
-          </h3>
-          {archived ? <Badge tone="neutral">Archived</Badge> : null}
-        </div>
-        {project.description ? (
-          <p className="mb-3 line-clamp-2 text-sm text-text-secondary">
-            {project.description}
+        <div className="min-w-0">
+          <div className="flex items-start gap-2">
+            <h3 className="min-w-0 break-words text-sm font-semibold text-text-primary">
+              {project.name}
+            </h3>
+            {archived ? <Badge tone="neutral">Archived</Badge> : null}
+          </div>
+          {project.description ? (
+            <p className="mt-1 line-clamp-1 break-words text-sm text-text-secondary">
+              {project.description}
+            </p>
+          ) : null}
+          <p className="mt-1 truncate text-xs text-text-secondary">
+            {project.organization.name}
           </p>
-        ) : null}
-        <div className="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-          <span>{project.organization.name}</span>
-          <span aria-hidden="true">·</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums text-text-secondary md:flex-col md:items-start">
           <span>
             {project._count.tasks} task{project._count.tasks === 1 ? "" : "s"}
           </span>
-          <span aria-hidden="true">·</span>
-          <span>{project._count.projectMembers} explicit member(s)</span>
+          <span>
+            {project._count.projectMembers} explicit{" "}
+            {project._count.projectMembers === 1 ? "member" : "members"}
+          </span>
         </div>
       </Link>
 
       {canAdminister ? (
-        <details className="shrink-0 text-sm">
+        <details className="relative justify-self-end text-sm">
           <summary
-            className="control-target cursor-pointer rounded-md px-3 py-2 hover:bg-hover"
+            className="control-target cursor-pointer rounded-md px-2 py-2 text-text-secondary hover:bg-hover hover:text-text-primary"
             aria-label={`Actions for ${project.name}`}
           >
             Actions
           </summary>
-          <div className="flex flex-wrap gap-1">
+          <div className="absolute right-0 top-full z-10 mt-1 flex w-40 flex-col gap-1 rounded-lg border border-border bg-raised p-1 shadow-lg">
             <Button
               variant="ghost"
               size="sm"
@@ -133,7 +140,7 @@ export function ProjectCard({
       ) : null}
 
       {actionError ? (
-        <p className="w-full text-sm text-danger" role="alert">
+        <p className="col-span-full text-sm text-danger" role="alert">
           {actionError instanceof ApiError
             ? actionError.message
             : "Project action failed."}
